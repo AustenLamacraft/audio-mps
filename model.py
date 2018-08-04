@@ -23,7 +23,7 @@ class AudioMPS:
         batch_zeros = tf.zeros_like(data[:,0])
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
         loss = batch_zeros
-        data = tf.transpose(data, [0,1]) # foldl goes along the first dimension
+        data = tf.transpose(data, [1,0]) # foldl goes along the first dimension
         _, loss = tf.foldl(self._psi_and_loss_update, data, initializer=(psi_0, loss))
         # TODO Should the loss be divided by the length?
         return loss
@@ -48,7 +48,7 @@ class AudioMPS:
         return new_psi
 
     def _expectation(self, psi):
-        exp =  tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
+        exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
         return 2 * tf.real(exp)
 
     def _hermitian_matrix(self, M):
