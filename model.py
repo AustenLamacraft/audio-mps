@@ -10,11 +10,11 @@ class AudioMPS:
         self.bond_d = bond_d
         self.delta_t = delta_t
 
-        self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.complex64,
-                                 initializer=tf.zeros_initializer(dtype=tf.complex64))
-        self.H = self._hermitian_matrix(self.H)
-        self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.complex64,
-                                 initializer=tf.zeros_initializer(dtype=tf.complex64))
+        self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
+                                 initializer=None)
+        self.H = self._symmetrize(self.H)
+        self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
+                                 initializer=None)
 
         self.loss = self._build_loss(data_iterator)
 
@@ -26,7 +26,7 @@ class AudioMPS:
         data = tf.transpose(data, [1,0]) # foldl goes along the first dimension
         _, loss = tf.foldl(self._psi_and_loss_update, data, initializer=(psi_0, loss))
         # TODO Should the loss be divided by the length?
-        return loss
+        return tf.reduce_mean(loss)
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
@@ -40,18 +40,21 @@ class AudioMPS:
     def _update_ancilla(self, psi, signal):
 
         signal = tf.cast(signal, dtype=tf.complex64)
-        Q = self.delta_t * (-1j*self.H - tf.matmul(self.R, self.R, adjoint_a=True) / 2)
+        H_c = tf.cast(self.H, dtype=tf.complex64)
+        R_c = tf.cast(self.R, dtype=tf.complex64)
+        Q = self.delta_t * (-1j * H_c - tf.matmul(R_c, R_c, transpose_a=True) / 2)
         new_psi = psi
         new_psi += tf.einsum('ab,cb->ca', Q, psi)
-        new_psi += self.delta_t * tf.einsum('a,bc,ac->ab', signal, self.R, psi)
+        new_psi += self.delta_t * tf.einsum('a,bc,ac->ab', signal, R_c, psi)
         new_psi = self._normalize(psi, axis=1)
         return new_psi
 
     def _expectation(self, psi):
-        exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
-        return 2 * tf.real(exp)
+        R_c = tf.cast(self.R, dtype=tf.complex64)
+        exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
+        return 2 * tf.real(exp) # Conveniently returns a float
 
-    def _hermitian_matrix(self, M):
+    def _symmetrize(self, M):
         M_lower = tf.matrix_band_part(M, -1, 0)  # takes the lower triangular part of M (including the diagonal)
         return M_lower + tf.matrix_transpose(M_lower)
 
