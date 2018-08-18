@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 class AudioMPS:
     """
@@ -17,6 +18,14 @@ class AudioMPS:
                                  initializer=None)
 
         self.loss = self._build_loss(data_iterator)
+
+
+    def sample(self, num_samples, length):
+        pass
+        # batch_zeros = tf.zeros([num_samples])
+        # psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
+        # samples = tf.random_normal([num_samples, length]) * np.sqrt(self.delta_t)
+        # samples = tf.scan(self._psi_update, samples, initializer=psi_0, batch_zeros)
 
 
     def _build_loss(self, data):
