@@ -6,8 +6,7 @@ class AudioMPS:
     Matrix Product State model for audio signal
     """
 
-    def __init__(self, bond_d, delta_t, data_iterator=None,
-                 num_samples=0, sample_length=1000):
+    def __init__(self, bond_d, delta_t, data_iterator=None):
 
         self.bond_d = bond_d
         self.delta_t = delta_t
@@ -21,13 +20,10 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
-        if num_samples != 0:
-            self.sample = self._sample(num_samples, sample_length)
-
-    def _sample(self, num_samples, length):
+    def sample(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
-        noise = tf.random_normal([length, num_samples], stddev=1/np.sqrt(self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         psi, samples = tf.scan(self._psi_and_sample_update, noise,
                              initializer=(psi_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
