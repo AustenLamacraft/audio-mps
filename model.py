@@ -27,7 +27,7 @@ class AudioMPS:
         psi, samples = tf.scan(self._psi_and_sample_update, noise,
                              initializer=(psi_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
-        return tf.transpose(samples, [1,0])
+        return tf.transpose(samples, [1, 0])
 
     def _build_loss(self, data):
         data = data[:,1:] - data[:,:-1] # Take the derivative
@@ -48,8 +48,8 @@ class AudioMPS:
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
         psi, last_sample = psi_and_sample
-        psi = self._update_ancilla(psi, noise)
         new_sample = last_sample + noise + self._expectation(psi)
+        psi = self._update_ancilla(psi, new_sample - last_sample)
         return psi, new_sample
 
     def _inc_loss(self, psi, signal):
