@@ -42,8 +42,8 @@ class AudioMPS:
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
-        psi = self._update_ancilla(psi, signal)
         loss += self._inc_loss(psi, signal)
+        psi = self._update_ancilla(psi, signal)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
