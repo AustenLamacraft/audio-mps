@@ -20,6 +20,7 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
+            
     def sample(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
@@ -27,30 +28,33 @@ class AudioMPS:
         psi, samples = tf.scan(self._psi_and_sample_update, noise,
                              initializer=(psi_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
-        return tf.transpose(samples, [1, 0])
+        return tf.transpose(samples, [1,0])
 
     def _build_loss(self, data):
-        data = data[:,1:] - data[:,:-1] # Take the derivative
+        #data = data[:,1:] - data[:,:-1] # Take the derivative 
         batch_zeros = tf.zeros_like(data[:,0])
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
         loss = batch_zeros
         data = tf.transpose(data, [1,0]) # foldl goes along the first dimension
         _, loss = tf.foldl(self._psi_and_loss_update, data,
                            initializer=(psi_0, loss), name="loss_fold")
-        # TODO Should the loss be divided by the length?
+        # TODO Should the loss be divided by the length? Beñat says no.
         return tf.reduce_mean(loss)
 
+    
     def _psi_and_loss_update(self, psi_and_loss, signal):
-        psi, loss = psi_and_loss
+        psi, loss = psi_and_loss 
         loss += self._inc_loss(psi, signal)
         psi = self._update_ancilla(psi, signal)
         return psi, loss
-
+    
+    
     def _psi_and_sample_update(self, psi_and_sample, noise):
         psi, last_sample = psi_and_sample
-        new_sample = last_sample + noise + self._expectation(psi)
-        psi = self._update_ancilla(psi, new_sample - last_sample)
+        new_sample = self._expectation(psi) + noise
+        psi = self._update_ancilla(psi, new_sample)
         return psi, new_sample
+
 
     def _inc_loss(self, psi, signal):
         return (signal - self._expectation(psi))**2 / 2
@@ -84,5 +88,4 @@ class AudioMPS:
             x_inv_norm = tf.rsqrt(tf.maximum(square_sum, epsilon))
             x_inv_norm = tf.cast(x_inv_norm, tf.complex64)
             return tf.multiply(x, x_inv_norm)
-
-        # que pasa weyyyyyyyyyyyyyyyyyyyyyyyyy
+# takes the yoloooooooo
