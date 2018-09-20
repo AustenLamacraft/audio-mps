@@ -37,8 +37,8 @@ class AudioMPS:
         data = tf.transpose(data, [1,0]) # foldl goes along the first dimension
         _, loss = tf.foldl(self._psi_and_loss_update, data,
                            initializer=(psi_0, loss), name="loss_fold")
-        # TODO Should the loss be divided by the length? Beñat says no.
-        return tf.reduce_mean(loss)
+        # TODO Should the loss be divided by the length? It might be a good idea to keep numbers small enough.
+        return tf.reduce_mean(loss)#mean devides the sum by the number of notes in the training set
 
     
     def _psi_and_loss_update(self, psi_and_loss, signal):
