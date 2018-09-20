@@ -75,8 +75,9 @@ class AudioMPS:
 
     def _symmetrize(self, M):
         with tf.variable_scope("symmetrize"):
-            M_lower = tf.matrix_band_part(M, -1, 0)  # takes the lower triangular part of M (including the diagonal)
-            return M_lower + tf.matrix_transpose(M_lower)
+            M_lower = tf.matrix_band_part(M, -1, 0) # takes the lower triangular part of M (including the diagonal)
+            M_diag = tf.matrix_band_part(M, 0, 0)
+            return M_lower + tf.matrix_transpose(M_lower) - M_diag
 
     def _normalize(self, x, axis=None, epsilon=1e-12):
         with tf.variable_scope("normalize"):
@@ -84,3 +85,4 @@ class AudioMPS:
             x_inv_norm = tf.rsqrt(tf.maximum(square_sum, epsilon))
             x_inv_norm = tf.cast(x_inv_norm, tf.complex64)
             return tf.multiply(x, x_inv_norm)
+
