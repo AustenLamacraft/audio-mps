@@ -7,22 +7,22 @@ class AudioMPS:
     Matrix Product State model for audio signal
     """
 
-    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, h0=None, r0=None):
+    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None):
 
         self.bond_d = bond_d
         self.delta_t = delta_t
         self.batch_size = batch_size
 
-        if r0 is not None:
+        if R_in is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
-                                     initializer=r0, trainable=False)
+                                     initializer=R_in, trainable=False)
         else:
             self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
                                      initializer=None)
 
-        if h0 is not None:
+        if H_in is not None:
             self.H = tf.get_variable("H", dtype=tf.float32,
-                                     initializer=h0, trainable=False)
+                                     initializer=H_in, trainable=False)
         else:
             self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
                                      initializer=None)
