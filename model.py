@@ -7,37 +7,30 @@ class AudioMPS:
     Matrix Product State model for audio signal
     """
 
-    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None):
+    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, h0=None, r0=None):
+
         self.bond_d = bond_d
         self.delta_t = delta_t
         self.batch_size = batch_size
 
-        #         h0 = tf.constant(np.array([[1.,2.],[2.,1.]]), shape=[bond_d, bond_d], dtype=tf.float32)
-        #         r0 = tf.constant(np.array([[1.,2.],[3.,4.]]), shape=[bond_d, bond_d], dtype=tf.float32)
+        if r0 is not None:
+            self.R = tf.get_variable("R", dtype=tf.float32,
+                                     initializer=r0, trainable=False)
+        else:
+            self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
+                                     initializer=None)
 
-        #         self.H = tf.get_variable("H", dtype=tf.float32,
-        #                                  initializer=h0,trainable=False)
-        #         self.H = self._symmetrize(self.H)
-        #         self.R = tf.get_variable("R", dtype=tf.float32,
-        #                                  initializer=r0,trainable=False)
+        if h0 is not None:
+            self.H = tf.get_variable("H", dtype=tf.float32,
+                                     initializer=h0, trainable=False)
+        else:
+            self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
+                                     initializer=None)
 
-        self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
-                                 initializer=None)
         self.H = self._symmetrize(self.H)
-        self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
-                                 initializer=None)
 
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
-
-    def sample(self, num_samples, length, temp=1):
-        batch_zeros = tf.zeros([num_samples])
-        rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
-        rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")
-        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
-        return tf.transpose(samples, [1, 0])
 
     def _build_loss(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
@@ -48,17 +41,26 @@ class AudioMPS:
                            initializer=(rho_0, loss), name="loss_fold")
         return tf.reduce_mean(loss)
 
-    def _rho_and_loss_update(self, rho_and_loss, signal):
-        rho, loss = rho_and_loss  # these come from initializer=(rho_0, loss), in _build_loss
-        loss += self._inc_loss(rho, signal)
-        rho = self._update_ancilla(rho, signal)
-        return rho, loss
+    def sample(self, num_samples, length, temp=1):
+        batch_zeros = tf.zeros([num_samples])
+        rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        rho, samples = tf.scan(self._rho_and_sample_update, noise,
+                               initializer=(rho_0, batch_zeros), name="sample_scan")
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        return tf.transpose(samples, [1, 0])
 
     def _rho_and_sample_update(self, rho_and_sample, noise):
         rho, last_sample = rho_and_sample
         new_sample = self._expectation(rho) + noise
         rho = self._update_ancilla(rho, new_sample)
         return rho, new_sample
+
+    def _rho_and_loss_update(self, rho_and_loss, signal):
+        rho, loss = rho_and_loss  # these come from initializer=(rho_0, loss), in _build_loss
+        loss += self._inc_loss(rho, signal)
+        rho = self._update_ancilla(rho, signal)
+        return rho, loss
 
     def _inc_loss(self, rho, signal):
         return (signal - self._expectation(rho)) ** 2 / 2
