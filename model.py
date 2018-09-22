@@ -30,15 +30,6 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
-    def _build_loss(self, data):
-        batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
-        rho_0 = tf.stack(self.batch_size * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
-        loss = batch_zeros
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        _, loss = tf.foldl(self._rho_and_loss_update, data,
-                           initializer=(rho_0, loss), name="loss_fold")
-        return tf.reduce_mean(loss)
-
     def sample(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
@@ -48,17 +39,26 @@ class AudioMPS:
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         return tf.transpose(samples, [1, 0])
 
-    def _rho_and_sample_update(self, rho_and_sample, noise):
-        rho, last_sample = rho_and_sample
-        new_sample = self._expectation(rho) + noise
-        rho = self._update_ancilla(rho, new_sample)
-        return rho, new_sample
+    def _build_loss(self, data):
+        batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
+        rho_0 = tf.stack(self.batch_size * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        loss = batch_zeros
+        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+        _, loss = tf.foldl(self._rho_and_loss_update, data,
+                           initializer=(rho_0, loss), name="loss_fold")
+        return tf.reduce_mean(loss)
 
     def _rho_and_loss_update(self, rho_and_loss, signal):
         rho, loss = rho_and_loss  # these come from initializer=(rho_0, loss), in _build_loss
         loss += self._inc_loss(rho, signal)
         rho = self._update_ancilla(rho, signal)
         return rho, loss
+
+    def _rho_and_sample_update(self, rho_and_sample, noise):
+        rho, last_sample = rho_and_sample
+        new_sample = self._expectation(rho) + noise
+        rho = self._update_ancilla(rho, new_sample)
+        return rho, new_sample
 
     def _inc_loss(self, rho, signal):
         return (signal - self._expectation(rho)) ** 2 / 2
