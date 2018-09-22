@@ -15,14 +15,14 @@ class AudioMPS:
 
         if R_in is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
-                                     initializer=R_in, trainable=False)
+                                     initializer=R_in)
         else:
             self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
                                      initializer=None)
 
         if H_in is not None:
             self.H = tf.get_variable("H", dtype=tf.float32,
-                                     initializer=H_in, trainable=False)
+                                     initializer=H_in)
         else:
             self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
                                      initializer=None)
