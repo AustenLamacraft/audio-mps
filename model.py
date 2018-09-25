@@ -34,7 +34,9 @@ class AudioMPS:
 
     def sample(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
-        rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        #rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        # PURE INITIAL STATE
+        rho_0 = tf.stack(self.batch_size * [tf.constant([[1, 0], [0, 0]], dtype=tf.complex64)])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="sample_scan")
@@ -43,7 +45,9 @@ class AudioMPS:
 
     def _build_loss(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
-        rho_0 = tf.stack(self.batch_size * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        #rho_0 = tf.stack(self.batch_size * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
+        #PURE INITIAL STATE
+        rho_0 = tf.stack(self.batch_size * [tf.constant([[1, 0], [0, 0]], dtype=tf.complex64)])
         loss = batch_zeros
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
