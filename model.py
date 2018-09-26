@@ -7,11 +7,17 @@ class AudioMPS:
     Matrix Product State model for audio signal
     """
 
-    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None):
+    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None, rho_0_in=None):
 
         self.bond_d = bond_d
         self.delta_t = delta_t
         self.batch_size = batch_size
+
+        if rho_0_in is not None:
+            self.rho_0 = rho_0
+
+        else:
+            self.rho_0 = (1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)
 
         if R_in is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
@@ -34,9 +40,7 @@ class AudioMPS:
 
     def sample(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
-        #rho_0 = tf.stack(num_samples * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
-        # PURE INITIAL STATE
-        rho_0 = tf.stack(self.batch_size * [tf.constant([[1, 0], [0, 0]], dtype=tf.complex64)])
+        rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="sample_scan")
@@ -45,9 +49,7 @@ class AudioMPS:
 
     def _build_loss(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
-        #rho_0 = tf.stack(self.batch_size * [(1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)])
-        #PURE INITIAL STATE
-        rho_0 = tf.stack(self.batch_size * [tf.constant([[1, 0], [0, 0]], dtype=tf.complex64)])
+        rho_0 = tf.stack(self.batch_size * [self.rho_0])
         loss = batch_zeros
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
