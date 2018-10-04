@@ -56,16 +56,18 @@ class AudioMPS:
         return tf.transpose(samples, [1, 0])
 
     def _build_loss(self, data):
-        batch_zeros = tf.zeros_like(data[:, 0])  # data[note,time]
+        batch_zeros = tf.zeros_like(data[:, 0])
         rho_0 = tf.stack(self.batch_size * [self.rho_0])
         loss = batch_zeros
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+        rho_0 = self._update_ancilla(rho_0, data[0])
+        data = data[1:]
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
         return tf.reduce_mean(loss)
 
     def _rho_and_loss_update(self, rho_and_loss, signal):
-        rho, loss = rho_and_loss  # these come from initializer=(rho_0, loss), in _build_loss
+        rho, loss = rho_and_loss
         loss += self._inc_loss(rho, signal)
         rho = self._update_ancilla(rho, signal)
         return rho, loss
@@ -79,7 +81,7 @@ class AudioMPS:
     def _inc_loss(self, rho, signal):
         return (signal - self._expectation(rho)) ** 2 / 2
 
-    def _update_ancilla(self, rho, signal):  # rho has dimensions (n_samp,D,D)
+    def _update_ancilla(self, rho, signal):
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
             H_c = tf.cast(self.H, dtype=tf.complex64)
@@ -105,7 +107,7 @@ class AudioMPS:
 
     def _symmetrize(self, M):
         with tf.variable_scope("symmetrize"):
-            M_lower = tf.matrix_band_part(M, -1, 0)  # takes the lower triangular part of M (including the diagonal)
+            M_lower = tf.matrix_band_part(M, -1, 0)
             M_diag = tf.matrix_band_part(M, 0, 0)
             return M_lower + tf.matrix_transpose(M_lower) - M_diag
 
@@ -115,5 +117,3 @@ class AudioMPS:
             x_inv_tr = tf.reciprocal(tf.maximum(tf.real(tr), epsilon))
             x_inv_tr = tf.cast(x_inv_tr, tf.complex64)
             return tf.multiply(x, x_inv_tr)
-
-yooooooooooooooooooooooooooooooooooooooooooooooooo
