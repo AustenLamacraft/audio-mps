@@ -38,6 +38,16 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
+    def steady_state_evolve_data(self, num_samples, length, data):
+        batch_zeros = tf.zeros([num_samples])
+        rho_0 = tf.stack(num_samples * [self.rho_0])
+        data = tf.transpose(data, [1, 0])
+        rho, _ = tf.scan(self._rho_update, data,
+                               initializer=(rho_0, batch_zeros), name="sample_scan")
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        return rho
+
+
     def steady_state(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
@@ -73,6 +83,12 @@ class AudioMPS:
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
         return tf.reduce_mean(loss)
+
+    def _rho_update(self, rho_and_loss, signal):
+        rho, loss = rho_and_loss
+        # loss += self._inc_loss(rho, signal)
+        rho = self._update_ancilla(rho, signal)
+        return rho, loss
 
     def _rho_and_loss_update(self, rho_and_loss, signal):
         rho, loss = rho_and_loss
