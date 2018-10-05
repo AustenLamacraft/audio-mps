@@ -38,7 +38,7 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
-    def steady_state_evolve_data(self, num_samples, length, data):
+    def steady_state_evolve_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         data = tf.transpose(data, [1, 0])
