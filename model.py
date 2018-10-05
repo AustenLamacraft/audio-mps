@@ -38,12 +38,20 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
+    def steady_state(self, num_samples, length, temp=1):
+        batch_zeros = tf.zeros([num_samples])
+        rho_0 = tf.stack(num_samples * [self.rho_0])
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        rho, samples = tf.scan(self._rho_and_sample_update, noise,
+                               initializer=(rho_0, batch_zeros), name="sample_scan")  #rho[t,sample,D,D]
+        return rho
+
     def purity(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")
+                               initializer=(rho_0, batch_zeros), name="sample_scan")  #rho[t,sample,D,D]
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
 
     def sample(self, num_samples, length, temp=1):
