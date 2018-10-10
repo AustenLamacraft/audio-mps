@@ -7,14 +7,14 @@ from model import AudioMPS
 
 BOND_D = 11 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
 dt  = 0.001
-BATCH_SIZE = 8
+BATCH_SIZE = 2
 
 # COHERENT STATE
 
-theta = 2.*np.pi
-#phi = 2.*np.pi/3
+theta = 2.*np.pi/3
+phi = 2.*np.pi/3
 #phi = 4.*np.pi/3
-phi = 2.*np.pi
+# phi = 2.*np.pi
 
 # CHOOSE DATA
 
@@ -25,8 +25,8 @@ phi = 2.*np.pi
 #path = '_gaussian'
 #path = '_sine'
 #path = '_damped_sine_1note'
-#path = '_damped_sine_2note'
-path = '_damped_sine_multirandomphase'
+path = '_damped_sine_2note'
+# path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
 
 
@@ -92,11 +92,11 @@ elif path == '_damped_sine_1note':
 
 elif path == '_damped_sine_2note':
 
-        INPUT_LENGTH = 10
+        INPUT_LENGTH = 50
         with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
                 range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                #data = tf.sin((range_stack / 2)+[[1.88],[np.pi+2.12]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-                data = tf.sin((range_stack / 2)+[[],[6.63],[],[]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
+                data = tf.sin((range_stack / 2)+[[0],[np.pi]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
+                # data = tf.sin((range_stack / 2)+[[],[6.63],[],[]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
 
 elif path == '_damped_sine_multirandomphase':
 
