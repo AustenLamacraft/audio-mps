@@ -73,6 +73,17 @@ class AudioMPS:
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         return tf.transpose(samples, [1, 0])
 
+    def sample_time_evolved_rho0(self, num_samples, length, data, temp=1):
+        batch_zeros = tf.zeros([num_samples])
+        rho_0 = tf.stack(num_samples * [self.rho_0])
+        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+        rho_0 = self._update_ancilla(rho_0, data[0])
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        rho, samples = tf.scan(self._rho_and_sample_update, noise,
+                               initializer=(rho_0, batch_zeros), name="sample_scan")
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        return tf.transpose(samples, [1, 0])
+
     def _build_loss(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])
         rho_0 = tf.stack(self.batch_size * [self.rho_0])
