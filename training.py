@@ -12,8 +12,8 @@ BATCH_SIZE = 2
 # COHERENT STATE
 
 theta = 2.*np.pi/3
-phi = 2.*np.pi/3
-#phi = 4.*np.pi/3
+#phi = 2.*np.pi/3
+phi = 4.*np.pi/3
 # phi = 2.*np.pi
 
 # CHOOSE DATA
@@ -33,7 +33,7 @@ path = '_damped_sine_2note'
 # CHOOSE INITIAL STATE OF THE ANCILLA
 
 # path_is = '_pure'
-#path_is = '_maximally_mixed'
+# path_is = '_maximally_mixed'
 path_is = '_coherent_pure'
 
 
@@ -95,7 +95,7 @@ elif path == '_damped_sine_2note':
         INPUT_LENGTH = 50
         with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
                 range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack / 2)+[[0],[np.pi]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
+                data = tf.sin((range_stack / 2)+[[0.],[np.pi]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
                 # data = tf.sin((range_stack / 2)+[[],[6.63],[],[]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
 
 elif path == '_damped_sine_multirandomphase':
@@ -156,5 +156,5 @@ train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=ste
 # RUN THE TRAINING LOOP
 
 tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
-                                           str(BATCH_SIZE)+path+"_theta"+str(theta)+"_phi"+
-                                           str(phi)+path_is,save_checkpoint_secs=60)
+                                           str(BATCH_SIZE)+path+"_theta"+str(theta)[:6]+"_phi"+
+                                           str(phi)[:6]+path_is,save_checkpoint_secs=60)
