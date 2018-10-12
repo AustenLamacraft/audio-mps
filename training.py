@@ -5,14 +5,14 @@ from model import AudioMPS
 
 # PARAMETERS
 
-BOND_D = 30 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+BOND_D = 50 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
 dt  = 0.001
 BATCH_SIZE = 20
 
 # COHERENT STATE
 
-# theta = 2.*np.pi/3
-#phi = 2.*np.pi/3
+theta = 2.*np.pi/3
+phi = 2.*np.pi/3
 # phi = 4.*np.pi/3
 # phi = 2.*np.pi
 
@@ -36,6 +36,9 @@ path = '_damped_sine_multirandomphase'
 path_is = '_maximally_mixed'
 # path_is = '_coherent_pure'
 
+if path_is is not '_coherent_pure':
+	theta = '_non'
+	phi = '_non'
 
 # CREATE DATA
 
