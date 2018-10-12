@@ -5,15 +5,15 @@ from model import AudioMPS
 
 # PARAMETERS
 
-BOND_D = 11 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+BOND_D = 30 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
 dt  = 0.001
-BATCH_SIZE = 2
+BATCH_SIZE = 20
 
 # COHERENT STATE
 
-theta = 2.*np.pi/3
+# theta = 2.*np.pi/3
 #phi = 2.*np.pi/3
-phi = 4.*np.pi/3
+# phi = 4.*np.pi/3
 # phi = 2.*np.pi
 
 # CHOOSE DATA
@@ -25,16 +25,16 @@ phi = 4.*np.pi/3
 #path = '_gaussian'
 #path = '_sine'
 #path = '_damped_sine_1note'
-path = '_damped_sine_2note'
-# path = '_damped_sine_multirandomphase'
+# path = '_damped_sine_2note'
+path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
 
 
 # CHOOSE INITIAL STATE OF THE ANCILLA
 
 # path_is = '_pure'
-# path_is = '_maximally_mixed'
-path_is = '_coherent_pure'
+path_is = '_maximally_mixed'
+# path_is = '_coherent_pure'
 
 
 # CREATE DATA
