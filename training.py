@@ -18,8 +18,8 @@ phi = 2.*np.pi/3
 
 # INVERSE FREQUENCY OF THE SINE
 
-invw = 4
-phase = 0
+invw = 2
+phase = 0*np.pi/3
 
 # CHOOSE DATA
 
@@ -169,4 +169,4 @@ train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=ste
 
 tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
                                            str(BATCH_SIZE)+path+"_theta"+str(theta)[:6]+"_phi"+
-                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase),save_checkpoint_secs=60)
+                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase)[:4],save_checkpoint_secs=60)
