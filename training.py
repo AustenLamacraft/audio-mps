@@ -16,6 +16,11 @@ phi = 2.*np.pi/3
 # phi = 4.*np.pi/3
 # phi = 2.*np.pi
 
+# INVERSE FREQUENCY OF THE SINE
+
+invw = 4
+phase = 0
+
 # CHOOSE DATA
 
 #path = '_linear'
@@ -23,10 +28,10 @@ phi = 2.*np.pi/3
 #path = '_linear_and_alphalinear'
 #path = '_quadratic'
 #path = '_gaussian'
-#path = '_sine'
+path = '_sine'
 #path = '_damped_sine_1note'
 # path = '_damped_sine_2note'
-path = '_damped_sine_multirandomphase'
+# path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
 
 
@@ -39,6 +44,10 @@ path_is = '_maximally_mixed'
 if path_is is not '_coherent_pure':
 	theta = '_non'
 	phi = '_non'
+
+if path_is is not '_sine':
+	invw = '_non'
+	phase = '_non'
 
 # CREATE DATA
 
@@ -81,10 +90,10 @@ elif path == '_gaussian':
 
 elif path == '_sine':
 
-        INPUT_LENGTH = 40
+        INPUT_LENGTH = 50
         with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
                 range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin(range_stack/2)
+                data = tf.sin(range_stack/invw)
 
 elif path == '_damped_sine_1note':
 
@@ -160,4 +169,4 @@ train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=ste
 
 tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
                                            str(BATCH_SIZE)+path+"_theta"+str(theta)[:6]+"_phi"+
-                                           str(phi)[:6]+path_is,save_checkpoint_secs=60)
+                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase),save_checkpoint_secs=60)
