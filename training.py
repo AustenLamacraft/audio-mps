@@ -5,21 +5,21 @@ from model import AudioMPS
 
 # PARAMETERS
 
-BOND_D = 50 #ODDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+BOND_D = 10
 dt  = 0.001
-BATCH_SIZE = 20
+BATCH_SIZE = 8
 
 # COHERENT STATE
 
-theta = 2.*np.pi/3
-phi = 2.*np.pi/3
-# phi = 4.*np.pi/3
+#theta = 2.*np.pi/3
 # phi = 2.*np.pi
 
-# INVERSE FREQUENCY OF THE SINE
+# INVERSE FREQUENCY OF THE SINE AND PHASE
 
-invw = 2
-phase = 0*np.pi/3
+#invw = 4
+invw = '_non'
+#phase = 4*np.pi/3
+phase = '_non'
 
 # CHOOSE DATA
 
@@ -28,26 +28,28 @@ phase = 0*np.pi/3
 #path = '_linear_and_alphalinear'
 #path = '_quadratic'
 #path = '_gaussian'
-path = '_sine'
+#path = '_sine'
 #path = '_damped_sine_1note'
-# path = '_damped_sine_2note'
-# path = '_damped_sine_multirandomphase'
+#path = '_damped_sine_2note'
+#path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
-
+path = '_sine_multirandomfrequencyandphase'
+#path = '_sine_multirandomphase'
+#path = '_sine_multirandomfrequency'
 
 # CHOOSE INITIAL STATE OF THE ANCILLA
 
-# path_is = '_pure'
-path_is = '_maximally_mixed'
-# path_is = '_coherent_pure'
+path_is = '_pure'
+#path_is = '_maximally_mixed'
+#path_is = '_coherent_pure'
 
 if path_is is not '_coherent_pure':
 	theta = '_non'
 	phi = '_non'
 
-if path_is is not '_sine':
-	invw = '_non'
-	phase = '_non'
+#if path is not '_sine':
+#invw = '_non'
+#phase = '_non'
 
 # CREATE DATA
 
@@ -93,7 +95,7 @@ elif path == '_sine':
         INPUT_LENGTH = 50
         with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
                 range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin(range_stack/invw)
+                data = tf.sin((range_stack/invw)+np.array([[phase]]))
 
 elif path == '_damped_sine_1note':
 
@@ -119,6 +121,27 @@ elif path == '_damped_sine_multirandomphase':
                 #data = tf.sin(range_stack / 2 + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
                 data = tf.sin((range_stack / 2)+qq)* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
 
+elif path == '_sine_multirandomphase':
+
+        INPUT_LENGTH = 50
+        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
+                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
+                data = tf.sin((range_stack / invw) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))
+
+elif path == '_sine_multirandomfrequencyandphase':
+
+        INPUT_LENGTH = 50
+        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
+                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
+                data = tf.sin((range_stack /tf.random_uniform([BATCH_SIZE,1],minval=2,maxval=4)) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))
+
+elif path == '_sine_multirandomfrequency':
+
+        INPUT_LENGTH = 50
+        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
+                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
+                data = tf.sin((range_stack / tf.random_uniform([BATCH_SIZE,1],minval=2,maxval=4))+np.array([[phase]]))
+
 elif path == '_two_quadratics':
 
         INPUT_LENGTH = 10
@@ -134,7 +157,9 @@ if path_is == '_maximally_mixed':
 
 elif path_is == '_pure':
 
-	rho_0 = tf.constant([[1,0],[0,0]],dtype=tf.complex64)
+	pure = np.zeros((BOND_D,BOND_D))
+	pure[0][0] = 1.
+	rho_0 = tf.constant(pure,dtype=tf.complex64)
 
 elif path_is == '_coherent_pure':
 
@@ -149,7 +174,7 @@ elif path_is == '_coherent_pure':
     cs = tf.cast(a1 * a2 * a3, tf.complex64) * a4
     rho_0 = tf.einsum('i,j->ij', tf.conj(cs), cs)
 
-# CREATE THE OBJECT sine_model
+# CREATE THE OBJECT our_model
 
 with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
     our_model = AudioMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, rho_0_in=rho_0)

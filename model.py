@@ -3,9 +3,7 @@ import numpy as np
 
 
 class AudioMPS:
-    """
-    Matrix Product State model for audio signal
-    """
+    """Matrix Product State model for audio signal"""
 
     def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None, rho_0_in=None):
 
@@ -38,22 +36,21 @@ class AudioMPS:
         if data_iterator is not None:
             self.loss = self._build_loss(data_iterator)
 
-    def steady_state_evolve_data(self, num_samples, data):
+    def rho_evolve_with_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         data = tf.transpose(data, [1, 0])
         rho, _ = tf.scan(self._rho_update, data,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")
-        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+                               initializer=(rho_0, batch_zeros), name="rho_scan_data_evolved")
         return rho
 
 
-    def steady_state(self, num_samples, length, temp=1):
+    def rho_with_sampling(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")  #rho[t,sample,D,D]
+                               initializer=(rho_0, batch_zeros), name="rho_scan")
         return rho
 
     def purity(self, num_samples, length, temp=1):
@@ -61,7 +58,7 @@ class AudioMPS:
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")  #rho[t,sample,D,D]
+                               initializer=(rho_0, batch_zeros), name="purity_scan")
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
 
     def sample(self, num_samples, length, temp=1):
@@ -74,13 +71,14 @@ class AudioMPS:
         return tf.transpose(samples, [1, 0])
 
     def sample_time_evolved_rho0(self, num_samples, length, data, temp=1):
+        """The data is only used to time evolve one step"""
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
         rho_0 = self._update_ancilla(rho_0, data[0])
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan")
+                               initializer=(rho_0, batch_zeros), name="sample_scan_time_evolved")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         return tf.transpose(samples, [1, 0])
 
@@ -97,7 +95,6 @@ class AudioMPS:
 
     def _rho_update(self, rho_and_loss, signal):
         rho, loss = rho_and_loss
-        # loss += self._inc_loss(rho, signal)
         rho = self._update_ancilla(rho, signal)
         return rho, loss
 
