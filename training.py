@@ -11,7 +11,7 @@ BATCH_SIZE = 8
 
 # COHERENT STATE
 
-#theta = 2.*np.pi/3
+# theta = 2.*np.pi/3
 # phi = 2.*np.pi
 
 # INVERSE FREQUENCY OF THE SINE AND PHASE

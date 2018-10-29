@@ -86,7 +86,7 @@ class AudioMPS:
         batch_zeros = tf.zeros_like(data[:, 0])
         rho_0 = tf.stack(self.batch_size * [self.rho_0])
         loss = batch_zeros
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+        data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
         rho_0 = self._update_ancilla(rho_0, data[0])
         data = data[1:]
         _, loss = tf.foldl(self._rho_and_loss_update, data,
