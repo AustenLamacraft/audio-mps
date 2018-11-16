@@ -16,8 +16,8 @@ BATCH_SIZE = 8
 
 # INVERSE FREQUENCY OF THE SINE AND PHASE
 
-#invw = 4
-invw = '_non'
+invw = 2
+# invw = '_non'
 #phase = 4*np.pi/3
 phase = '_non'
 
@@ -31,9 +31,9 @@ phase = '_non'
 #path = '_sine'
 #path = '_damped_sine_1note'
 #path = '_damped_sine_2note'
-#path = '_damped_sine_multirandomphase'
+path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
-path = '_sine_multirandomfrequencyandphase'
+# path = '_sine_multirandomfrequencyandphase'
 #path = '_sine_multirandomphase'
 #path = '_sine_multirandomfrequency'
 
@@ -112,21 +112,19 @@ elif path == '_damped_sine_2note':
                 data = tf.sin((range_stack / 2)+[[0.],[np.pi]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
                 # data = tf.sin((range_stack / 2)+[[],[6.63],[],[]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
 
-elif path == '_damped_sine_multirandomphase':
-
-        qq = np.reshape(np.random.uniform(np.zeros(BATCH_SIZE),2*np.pi*np.ones(BATCH_SIZE)),(BATCH_SIZE,1))
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                #data = tf.sin(range_stack / 2 + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-                data = tf.sin((range_stack / 2)+qq)* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-
 elif path == '_sine_multirandomphase':
 
         INPUT_LENGTH = 50
         with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
                 range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
                 data = tf.sin((range_stack / invw) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))
+
+elif path == '_damped_sine_multirandomphase':
+
+        INPUT_LENGTH = 50
+        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
+                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
+                data = tf.sin((range_stack / invw) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi)) * tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
 
 elif path == '_sine_multirandomfrequencyandphase':
 
