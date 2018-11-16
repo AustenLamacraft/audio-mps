@@ -21,6 +21,9 @@ invw = '_non'
 #phase = 4*np.pi/3
 phase = '_non'
 
+# Choose between pure and mixed model. True = mixed & False = pure
+discr = False
+
 # CHOOSE DATA
 
 #path = '_linear'
@@ -177,7 +180,7 @@ elif path_is == '_coherent_pure':
 # CREATE THE OBJECT our_model
 
 with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-    our_model = AudioMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, rho_0_in=rho_0)
+    our_model = AudioMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, rho_0_in=rho_0, mixed=discr)
 
 # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
 
@@ -194,4 +197,5 @@ train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=ste
 
 tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
                                            str(BATCH_SIZE)+path+"_theta"+str(theta)[:6]+"_phi"+
-                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase)[:4],save_checkpoint_secs=60)
+                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase)[:4]+
+                                           "_discr"+str(discr),save_checkpoint_secs=60)
