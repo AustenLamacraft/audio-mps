@@ -22,7 +22,7 @@ phase = 4*np.pi/3
 # phase = '_non'
 
 # Choose between pure and mixed model. True = mixed & False = pure
-discr = False
+discr = True
 
 # CHOOSE DATA
 
