@@ -3,7 +3,7 @@ import numpy as np
 
 class AudioMPS:
     """
-    Matrix Product State model for audio signall
+    Matrix Product State model for audio signal
     """
 
     def __init__(self, bond_d, delta_t, data_iterator=None):
@@ -42,8 +42,8 @@ class AudioMPS:
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
-        loss += self._inc_loss(psi, signal)
         psi = self._update_ancilla(psi, signal)
+        loss += self._inc_loss(psi, signal)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
