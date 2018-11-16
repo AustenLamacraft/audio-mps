@@ -5,17 +5,17 @@ import numpy as np
 class AudioMPS:
     """Matrix Product State model for audio signal"""
 
-    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None, rho_0_in=None):
+    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None, rho_0_in=None, mixed=False):
 
         self.bond_d = bond_d
         self.delta_t = delta_t
         self.batch_size = batch_size
 
-        if rho_0_in is not None:
-            self.rho_0 = rho_0_in
-
-        else:
-            self.rho_0 = (1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)
+        if mixed:
+            if rho_0_in is not None:
+                self.rho_0 = rho_0_in
+            else:
+                self.rho_0 = (1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)
 
         if R_in is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
