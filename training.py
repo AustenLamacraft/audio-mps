@@ -5,9 +5,9 @@ from model import AudioMPS
 
 # PARAMETERS
 
-BOND_D = 10
+BOND_D = 2
 dt  = 0.001
-BATCH_SIZE = 8
+BATCH_SIZE = 1
 
 # COHERENT STATE
 
@@ -16,10 +16,10 @@ BATCH_SIZE = 8
 
 # INVERSE FREQUENCY OF THE SINE AND PHASE
 
-#invw = 4
-invw = '_non'
-#phase = 4*np.pi/3
-phase = '_non'
+invw = 4
+# invw = '_non'
+phase = 4*np.pi/3
+# phase = '_non'
 
 # Choose between pure and mixed model. True = mixed & False = pure
 discr = False
@@ -31,12 +31,12 @@ discr = False
 #path = '_linear_and_alphalinear'
 #path = '_quadratic'
 #path = '_gaussian'
-#path = '_sine'
+path = '_sine'
 #path = '_damped_sine_1note'
 #path = '_damped_sine_2note'
 #path = '_damped_sine_multirandomphase'
 #path = '_two_quadratics'
-path = '_sine_multirandomfrequencyandphase'
+# path = '_sine_multirandomfrequencyandphase'
 #path = '_sine_multirandomphase'
 #path = '_sine_multirandomfrequency'
 
