@@ -3,7 +3,12 @@ import numpy as np
 
 
 class AudioMPS:
-    """Matrix Product State model for audio signal"""
+    """
+    Matrix Product State model for audio signal.
+    The argument mixed discriminates between two models:
+        mixed=False: dynamics of a pure quantum state
+        mixed=True: dynamics of a density matrix
+    """
 
     def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H_in=None, R_in=None, rho_0_in=None, mixed=False):
 
