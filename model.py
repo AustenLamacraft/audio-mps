@@ -3,7 +3,7 @@ import numpy as np
 
 class AudioMPS:
     """
-    Matrix Product State model for audio signal
+    Matrix Product State model for audio signall
     """
 
     def __init__(self, bond_d, delta_t, data_iterator=None):
