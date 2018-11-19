@@ -14,4 +14,12 @@ It defines our RNN model.
 
 * training.py
 
-It loads the training data (or it creates it), and runs the training.
+It loads the training data, and runs the training.
+
+* reader.py
+
+It picks out a subset of the data, that contains a desired feature: pitch, instrument ...
+
+* make-small-dataset.py
+
+It imports reader.py to make the dataset.
