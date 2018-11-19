@@ -10,7 +10,7 @@ Audio Synthesis with Matrix Product States
 
 * model.py
 
-It defines our RNN model.
+It defines our RNN model and contains other methods, to sample from the trained model for example.
 
 * training.py
 
