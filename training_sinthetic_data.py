@@ -4,7 +4,7 @@ import numpy as np
 from model import AudioMPS
 
 # PARAMETERS
-BOND_D = 10
+BOND_D = 1005
 dt  = 0.001
 BATCH_SIZE = 32
 
@@ -15,22 +15,27 @@ discr = False
 path_is = '_pure'
 #path_is = '_maximally_mixed'
 
-# LOAD DATA
-dataset = tf.data.TFRecordDataset('/rscratch/bm485/Code/audio-mps/audio-mps-github/data/pitch_30.tfrecords')
+# # LOAD DATA
+# dataset = tf.data.TFRecordDataset('/rscratch/bm485/Code/audio-mps/audio-mps-github/data/pitch_30.tfrecords')
+#
+# # PARSE THE RECORD INTO TENSORS
+# parse_function = lambda example_proto: tf.parse_single_example(example_proto,
+#                                                                {"audio": tf.FixedLenFeature([2**16], dtype=tf.float32)})
+# #TODO change to 64000 when I drop the padding in future datasets
+# dataset = dataset.map(parse_function)
+#
+# # CONSUMING TFRecord DATA
+# dataset = dataset.batch(batch_size=BATCH_SIZE)
+# dataset = dataset.shuffle(buffer_size=100)
+# dataset = dataset.repeat()
+# iterator = dataset.make_one_shot_iterator()
+# batch = iterator.get_next()
+# data = batch['audio']
 
-# PARSE THE RECORD INTO TENSORS
-parse_function = lambda example_proto: tf.parse_single_example(example_proto,
-                                                               {"audio": tf.FixedLenFeature([2**16], dtype=tf.float32)})
-#TODO change to 64000 when I drop the padding in future datasets
-dataset = dataset.map(parse_function)
-
-# CONSUMING TFRecord DATA
-dataset = dataset.batch(batch_size=BATCH_SIZE)
-dataset = dataset.shuffle(buffer_size=100)
-dataset = dataset.repeat()
-iterator = dataset.make_one_shot_iterator()
-batch = iterator.get_next()
-data = batch['audio']
+INPUT_LENGTH = 200
+with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
+	range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
+	data = tf.sin(range_stack/4 + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))* tf.exp(-0.03*tf.range(INPUT_LENGTH,dtype=np.float32))
 
 # INITIAL STATE OF ANCILLA IF MIXED
 if discr:
@@ -60,4 +65,4 @@ train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=ste
 
 # RUN THE TRAINING LOOP
 tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
-                                           str(BATCH_SIZE)+"_discr"+str(discr),save_checkpoint_secs=60)
+                                           str(BATCH_SIZE)+"_discr"+str(discr)+"_sinthetic",save_checkpoint_secs=60)
