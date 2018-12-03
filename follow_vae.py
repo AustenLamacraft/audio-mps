@@ -50,7 +50,7 @@ FLAGS = flags.FLAGS
 # self.H = self._symmetrize(self.H)
 # self.loss = self._build_loss_psi(data_iterator)
 
-self.bond_d = FLAGS.bond_d
+# self.bond_d = FLAGS.bond_d
 
 def build_loss_psi(data):
     batch_zeros = tf.zeros_like(data[:, 0])
@@ -102,8 +102,9 @@ def model_fn(features, labels, mode, params, config):
   data = features
   # loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
   loss = build_loss_psi(data, params["bond_d"])
-  step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-  train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=step)
+  # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+  global_step = tf.train.get_or_create_global_step()
+  train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=global_step)
 
   return tf.estimator.EstimatorSpec(
       mode=mode,
