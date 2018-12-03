@@ -14,7 +14,7 @@ import tensorflow as tf
 from model import AudioMPS
 
 flags.DEFINE_integer(
-    "viz_steps", default=2, help="Frequency at which to save visualizations.")
+    "viz_steps", default=1, help="Frequency at which to save visualizations.")
 flags.DEFINE_integer(
     "max_steps", default=5001, help="Number of training steps to run.")
 flags.DEFINE_integer(
@@ -43,41 +43,6 @@ flags.DEFINE_string(
 
 FLAGS = flags.FLAGS
 
-# self.bond_d = bond_d
-# self.delta_t = delta_t
-# self.batch_size = batch_size
-# self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
-# self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
-# self.H = self._symmetrize(self.H)
-# self.loss = self._build_loss_psi(data_iterator)
-
-# self.bond_d = FLAGS.bond_d
-
-
-# def build_loss_psi(data):
-#     batch_zeros = tf.zeros_like(data[:, 0])
-#     psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), 10, dtype=tf.complex64)
-#     loss = batch_zeros
-#     data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-#     _, loss = tf.foldl(_psi_and_loss_update, data,
-#                        initializer=(psi_0, loss), name="loss_fold")
-#     return tf.reduce_mean(loss)
-#
-# def _psi_and_loss_update(psi_and_loss, signal):
-#     psi, loss = psi_and_loss
-#     loss += _inc_loss_psi(psi, signal)
-#     return psi, loss
-#
-# def _inc_loss_psi(psi, signal):
-#     return (signal - _expectation_psi(psi)) ** 2 / 2
-#
-# def _expectation_psi(psi):
-#     R = tf.get_variable(name="R", shape=[10, 10], dtype=tf.float32, initializer=None)
-#     R_c = tf.cast(R, dtype=tf.complex64)
-#     exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
-#     return 2 * tf.real(exp)
-
-
 def audiomps(bond_d, dt, batch_size, data, discr):
     our_model = AudioMPS(bond_d, dt, batch_size, data_iterator=data, mixed=discr)
     return our_model
@@ -104,17 +69,9 @@ def model_fn(features, labels, mode, params, config):
 
   data = features
   loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
-  # R = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).R
-  # H = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).H
-
-  # loss = build_loss_psi(data)
-
-  # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
   tf.summary.scalar("loss_function", tf.reshape(loss, []))
-  # tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
-  # tf.summary.scalar("R_00", tf.reshape(R[0][0], []))
 
-  # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+
   global_step = tf.train.get_or_create_global_step()
   train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=global_step)
 
