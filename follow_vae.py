@@ -33,7 +33,7 @@ flags.DEFINE_integer(
     help="Batch size.")
 flags.DEFINE_string(
     "model_dir",
-    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"), "vae/"),
+    default="../logging/loggingrrrrrrrr",
     help="Directory to put the model's fit.")
 flags.DEFINE_string(
     "data_dir",
@@ -52,6 +52,7 @@ FLAGS = flags.FLAGS
 # self.loss = self._build_loss_psi(data_iterator)
 
 # self.bond_d = FLAGS.bond_d
+
 
 def build_loss_psi(data):
     batch_zeros = tf.zeros_like(data[:, 0])
@@ -97,12 +98,20 @@ def model_fn(features, labels, mode, params, config):
   """
   del labels, config
 
+
   # PARAMS ARE THE FLAGS DEFINED ABOVE
   # FEATURES CORRECTLY USED ??????????????????????????????
 
   data = features
   # loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
+
   loss = build_loss_psi(data)
+
+  # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
+  tf.summary.scalar("loss_function", tf.reshape(loss, []))
+  # tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
+  # tf.summary.scalar("R_00", tf.reshape(R[0][0], []))
+
   # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
   global_step = tf.train.get_or_create_global_step()
   train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=global_step)
