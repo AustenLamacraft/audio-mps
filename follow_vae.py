@@ -37,7 +37,8 @@ flags.DEFINE_string(
     help="Directory to put the model's fit.")
 flags.DEFINE_string(
     "data_dir",
-    default="/Users/mencia/PhD_local/audioMPS/data/pitch_30.tfrecords",
+    # default="/Users/mencia/PhD_local/audioMPS/data/pitch_30.tfrecords",
+    default="/rscratch/bm485/Code/audio-mps/audio-mps-github/data/pitch_30.tfrecords",
     help="Directory where data is stored (if using real data).")
 
 FLAGS = flags.FLAGS
@@ -54,7 +55,7 @@ FLAGS = flags.FLAGS
 
 def build_loss_psi(data):
     batch_zeros = tf.zeros_like(data[:, 0])
-    psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
+    psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), 10, dtype=tf.complex64)
     loss = batch_zeros
     data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
     _, loss = tf.foldl(_psi_and_loss_update, data,
@@ -70,7 +71,7 @@ def _inc_loss_psi(psi, signal):
     return (signal - _expectation_psi(psi)) ** 2 / 2
 
 def _expectation_psi(psi):
-    R = tf.get_variable(name="R", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
+    R = tf.get_variable(name="R", shape=[10, 10], dtype=tf.float32, initializer=None)
     R_c = tf.cast(R, dtype=tf.complex64)
     exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
     return 2 * tf.real(exp)
@@ -101,7 +102,7 @@ def model_fn(features, labels, mode, params, config):
 
   data = features
   # loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
-  loss = build_loss_psi(data, params["bond_d"])
+  loss = build_loss_psi(data)
   # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
   global_step = tf.train.get_or_create_global_step()
   train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=global_step)
