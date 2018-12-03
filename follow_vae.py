@@ -33,7 +33,7 @@ flags.DEFINE_integer(
     help="Batch size.")
 flags.DEFINE_string(
     "model_dir",
-    default="../logging/loggingrrrrrrrr",
+    default="../logging/loggingrrrrrrrrtt",
     help="Directory to put the model's fit.")
 flags.DEFINE_string(
     "data_dir",
@@ -54,33 +54,33 @@ FLAGS = flags.FLAGS
 # self.bond_d = FLAGS.bond_d
 
 
-def build_loss_psi(data):
-    batch_zeros = tf.zeros_like(data[:, 0])
-    psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), 10, dtype=tf.complex64)
-    loss = batch_zeros
-    data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-    _, loss = tf.foldl(_psi_and_loss_update, data,
-                       initializer=(psi_0, loss), name="loss_fold")
-    return tf.reduce_mean(loss)
+# def build_loss_psi(data):
+#     batch_zeros = tf.zeros_like(data[:, 0])
+#     psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), 10, dtype=tf.complex64)
+#     loss = batch_zeros
+#     data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+#     _, loss = tf.foldl(_psi_and_loss_update, data,
+#                        initializer=(psi_0, loss), name="loss_fold")
+#     return tf.reduce_mean(loss)
+#
+# def _psi_and_loss_update(psi_and_loss, signal):
+#     psi, loss = psi_and_loss
+#     loss += _inc_loss_psi(psi, signal)
+#     return psi, loss
+#
+# def _inc_loss_psi(psi, signal):
+#     return (signal - _expectation_psi(psi)) ** 2 / 2
+#
+# def _expectation_psi(psi):
+#     R = tf.get_variable(name="R", shape=[10, 10], dtype=tf.float32, initializer=None)
+#     R_c = tf.cast(R, dtype=tf.complex64)
+#     exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
+#     return 2 * tf.real(exp)
 
-def _psi_and_loss_update(psi_and_loss, signal):
-    psi, loss = psi_and_loss
-    loss += _inc_loss_psi(psi, signal)
-    return psi, loss
 
-def _inc_loss_psi(psi, signal):
-    return (signal - _expectation_psi(psi)) ** 2 / 2
-
-def _expectation_psi(psi):
-    R = tf.get_variable(name="R", shape=[10, 10], dtype=tf.float32, initializer=None)
-    R_c = tf.cast(R, dtype=tf.complex64)
-    exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
-    return 2 * tf.real(exp)
-
-
-# def audiomps(bond_d, dt, batch_size, data, discr):
-#     our_model = AudioMPS(bond_d, dt, batch_size, data_iterator=data, mixed=discr)
-#     return our_model
+def audiomps(bond_d, dt, batch_size, data, discr):
+    our_model = AudioMPS(bond_d, dt, batch_size, data_iterator=data, mixed=discr)
+    return our_model
 
 
 def model_fn(features, labels, mode, params, config):
@@ -103,9 +103,11 @@ def model_fn(features, labels, mode, params, config):
   # FEATURES CORRECTLY USED ??????????????????????????????
 
   data = features
-  # loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
+  loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
+  # R = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).R
+  # H = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).H
 
-  loss = build_loss_psi(data)
+  # loss = build_loss_psi(data)
 
   # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
   tf.summary.scalar("loss_function", tf.reshape(loss, []))
