@@ -12,10 +12,6 @@ Audio Synthesis with Matrix Product States
 
 It defines our RNN model and contains other methods, to sample from the trained model for example.
 
-* training.py
-
-It loads the training data, and runs the training.
-
 * training_estimators.py
 
 It loads the training data, and runs the training. A custom estimator is used.
