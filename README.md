@@ -16,6 +16,10 @@ It defines our RNN model and contains other methods, to sample from the trained 
 
 It loads the training data, and runs the training.
 
+* training_estimators.py
+
+It loads the training data, and runs the training. A custom estimator is used.
+
 * reader.py
 
 It picks out a subset of the data, that contains a desired feature: pitch, instrument ...
