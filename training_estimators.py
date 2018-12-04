@@ -25,8 +25,6 @@ flags.DEFINE_bool(
     "discr",
     default=False,
     help="If false, we are using a pure state.")
-# flags.DEFINE_float(
-#     "learning_rate", default=1e-3, help="Initial learning rate.")
 flags.DEFINE_integer(
     "batch_size",
     default=32,
@@ -37,7 +35,6 @@ flags.DEFINE_string(
     help="Directory to put the model's fit.")
 flags.DEFINE_string(
     "data_dir",
-    # default="/Users/mencia/PhD_local/audioMPS/data/pitch_30.tfrecords",
     default="/rscratch/bm485/Code/audio-mps/audio-mps-github/data/pitch_30.tfrecords",
     help="Directory where data is stored (if using real data).")
 
@@ -63,14 +60,9 @@ def model_fn(features, labels, mode, params, config):
   """
   del labels, config
 
-
-  # PARAMS ARE THE FLAGS DEFINED ABOVE
-  # FEATURES CORRECTLY USED ??????????????????????????????
-
   data = features
   loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
   tf.summary.scalar("loss_function", tf.reshape(loss, []))
-
 
   global_step = tf.train.get_or_create_global_step()
   train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=global_step)
@@ -88,7 +80,7 @@ def static_nsynth_dataset(directory):
   def _parser(example_proto):
       features = {"audio": tf.FixedLenFeature([2 ** 16], dtype=tf.float32)}
       parsed_features = tf.parse_single_example(example_proto, features)
-      return parsed_features["audio"] # Do I put ["audio"] ??????
+      return parsed_features["audio"]
 
   return dataset.map(_parser)
 
