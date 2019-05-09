@@ -50,9 +50,35 @@ FLAGS = flags.FLAGS
 # self.H = self._symmetrize(self.H)
 # self.loss = self._build_loss_psi(data_iterator)
 
-def audiomps(bond_d, dt, batch_size, data, discr):
-    our_model = AudioMPS(bond_d, dt, batch_size, data_iterator=data, mixed=discr)
-    return our_model
+self.bond_d = FLAGS.bond_d
+
+def build_loss_psi(data):
+    batch_zeros = tf.zeros_like(data[:, 0])
+    psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
+    loss = batch_zeros
+    data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
+    _, loss = tf.foldl(_psi_and_loss_update, data,
+                       initializer=(psi_0, loss), name="loss_fold")
+    return tf.reduce_mean(loss)
+
+def _psi_and_loss_update(psi_and_loss, signal):
+    psi, loss = psi_and_loss
+    loss += _inc_loss_psi(psi, signal)
+    return psi, loss
+
+def _inc_loss_psi(psi, signal):
+    return (signal - _expectation_psi(psi)) ** 2 / 2
+
+def _expectation_psi(psi):
+    R = tf.get_variable(name="R", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
+    R_c = tf.cast(R, dtype=tf.complex64)
+    exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
+    return 2 * tf.real(exp)
+
+
+# def audiomps(bond_d, dt, batch_size, data, discr):
+#     our_model = AudioMPS(bond_d, dt, batch_size, data_iterator=data, mixed=discr)
+#     return our_model
 
 
 def model_fn(features, labels, mode, params, config):
@@ -71,19 +97,11 @@ def model_fn(features, labels, mode, params, config):
   del labels, config
 
   # PARAMS ARE THE FLAGS DEFINED ABOVE
-
-  # Perform variational inference by minimizing the -ELBO.
-  # global_step = tf.train.get_or_create_global_step()
-  # learning_rate = tf.train.cosine_decay(params["learning_rate"], global_step,
-  #                                       params["max_steps"])
-  # tf.summary.scalar("learning_rate", learning_rate)
-  # optimizer = tf.train.AdamOptimizer(learning_rate)
-  # train_op = optimizer.minimize(loss, global_step=global_step)
-
   # FEATURES CORRECTLY USED ??????????????????????????????
 
   data = features
-  loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
+  # loss = audiomps(params["bond_d"], params["dt"], params["batch_size"], data, params["discr"]).loss
+  loss = build_loss_psi(data, params["bond_d"])
   step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
   train_op = tf.train.AdamOptimizer(1e-3).minimize(loss, global_step=step)
 
@@ -100,15 +118,15 @@ def static_nsynth_dataset(directory):
   def _parser(example_proto):
       features = {"audio": tf.FixedLenFeature([2 ** 16], dtype=tf.float32)}
       parsed_features = tf.parse_single_example(example_proto, features)
-      return parsed_features # Do I put ["audio"] ??????
+      return parsed_features["audio"] # Do I put ["audio"] ??????
 
   return dataset.map(_parser)
 
-def build_input_fns(batch_size):
+def build_input_fns(data_dir, batch_size):
   """Builds an Iterator switching between train and heldout data."""
 
   # Build an iterator over training batches.
-  training_dataset = static_nsynth_dataset('/Users/mencia/PhD_local/audioMPS/data/pitch_30.tfrecords')
+  training_dataset = static_nsynth_dataset(data_dir)
   training_dataset = training_dataset.shuffle(buffer_size=24).repeat().batch(batch_size)
   train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
 
@@ -120,7 +138,7 @@ def main(argv):
   params = FLAGS.flag_values_dict()
   tf.gfile.MakeDirs(FLAGS.model_dir)
 
-  train_input_fn = build_input_fns(FLAGS.batch_size)
+  train_input_fn = build_input_fns(FLAGS.data_dir, FLAGS.batch_size)
 
   estimator = tf.estimator.Estimator(
       model_fn,
@@ -130,5 +148,8 @@ def main(argv):
           save_checkpoints_steps=FLAGS.viz_steps,
       ),
   )
+
+  for _ in range(FLAGS.max_steps // FLAGS.viz_steps):
+    estimator.train(train_input_fn, steps=FLAGS.viz_steps)
 
 tf.app.run()
