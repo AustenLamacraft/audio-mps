@@ -9,7 +9,7 @@ class TestCMPS(tf.test.TestCase):
 
         model = CMPS(bond_d=8, delta_t=0.01, batch_size=8)
 
-        with self.session() as sess:
+        with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(model.H, tf.linalg.adjoint(model.H))
 
@@ -20,7 +20,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
         model = RhoCMPS(bond_d=8, delta_t=0.01, batch_size=8)
 
-        with self.session() as sess:
+        with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(model.rho_0, model.rho_0 / tf.trace(model.rho_0))
 

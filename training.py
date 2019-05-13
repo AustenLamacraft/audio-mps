@@ -14,10 +14,13 @@ tf.set_random_seed(0)
 FLAGS = tf.flags.FLAGS
 
 # Training flags
+tf.flags.DEFINE_enum('dataset', 'guitar',
+                     ['damped_sine', 'guitar', 'organ', 'nsynth'],
+                     'Dataset. Must be one of "damped_sine", "guitar", "organ", or "nsynth".')
 tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization.')
 tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
 tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
-tf.flags.DEFINE_string("logdir", f"../logging/canonical_flows/{FLAGS.hamiltonian}", "Directory to write logs.")
+tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Directory to write logs.")
 
 
 def main(argv):
@@ -53,7 +56,7 @@ def main(argv):
 
     # CREATE THE OBJECT our_model
     with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-        our_model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data)
+        our_model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data, rho_0=rho_0)
 
     # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
     tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
