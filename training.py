@@ -39,7 +39,7 @@ def main(argv):
     path_is = '_pure'
     #path_is = '_maximally_mixed'
 
-    data = get_audio(hparams)
+    data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     # INITIAL STATE OF ANCILLA IF MIXED
     if discr:
@@ -54,22 +54,26 @@ def main(argv):
                     rho_0 = tf.constant(pure, dtype=tf.complex64)
 
 
-    # CREATE THE OBJECT our_model
-    with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-        our_model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data, rho_0=rho_0)
 
-    # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
-    tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
-    tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
-    tf.summary.scalar("R_00", tf.reshape(our_model.R[0][0], []))
+    with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
+        model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data, rho_0=rho_0)
 
-    # global_step: Optional Variable to increment by one after the variables have been updated.
+
+    tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
+    tf.summary.scalar("H_00", tf.reshape(model.H[0][0], []))
+    tf.summary.scalar("R_00", tf.reshape(model.R[0][0], []))
+
+    if FLAGS.visualize:
+        # TODO Create waveform summaries using tfplot. Add purity
+        pass
+
     step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-    train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=step)
+    train_op = tf.train.AdamOptimizer(1e-3).minimize(model.loss, global_step=step)
 
-    # RUN THE TRAINING LOOP
-    tf.contrib.training.train(train_op, logdir="../logging/logging_D" + str(bond_dim) + "_dt" + str(dt) + "_batchsize" +
-                                               str(minibatch_size) + "_discr" + str(discr), save_checkpoint_secs=60)
+    # TODO Unrolling in time?
+
+    tf.contrib.training.train(train_op, save_checkpoint_secs=60,
+                              logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
 
 if __name__ == '__main__':
     tf.app.run(main)

@@ -13,7 +13,7 @@ class TestGetAudio(tf.test.TestCase):
 
         data = get_audio('../data', 'guitar', hps)
         with self.cached_session() as sess:
-            self.assertEquals(data.eval().shape[0], hps.minibatch_size)
+            self.assertEqual(data.eval().shape[0], hps.minibatch_size)
 
 
 if __name__ == '__main__':

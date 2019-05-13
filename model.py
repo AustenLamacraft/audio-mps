@@ -14,6 +14,8 @@ class CMPS:
         self.batch_size = batch_size
         self.data_iterator = data_iterator
 
+        # TODO Switch to complex
+
         if R is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
                                      initializer=R)
@@ -35,6 +37,9 @@ class RhoCMPS(CMPS):
     """
         Evolves the density matrix
     """
+    # TODO Switch to increments
+    # TODO Initial density matrix must be learnable
+
 
     def __init__(self, rho_0=None, *args, **kwargs):
         super(RhoCMPS, self).__init__(*args, **kwargs)
@@ -50,7 +55,7 @@ class RhoCMPS(CMPS):
         rho_0 = tf.stack(num_samples * [self.rho_0])
         data = tf.transpose(data, [1, 0])
         rho, _ = tf.scan(self._rho_update, data,
-                               initializer=(rho_0, batch_zeros), name="rho_scan_data_evolved")
+                         initializer=(rho_0, batch_zeros), name="rho_scan_data_evolved")
         return rho
 
     def rho_evolve_with_sampling(self, num_samples, length, temp=1):
@@ -77,7 +82,7 @@ class RhoCMPS(CMPS):
                                initializer=(rho_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         return tf.transpose(samples, [1, 0])
-
+    #
     def sample_time_evolved_rho0(self, num_samples, length, data, temp=1):
         """The data is only used to time evolve one step"""
         batch_zeros = tf.zeros([num_samples])
@@ -161,6 +166,7 @@ class PsiCMPS(CMPS):
     """
         Evolves the state
     """
+    # TODO Switch to increments
 
     def __init__(self, *args, **kwargs):
         super(PsiCMPS, self).__init__(*args, **kwargs)
@@ -230,8 +236,8 @@ class PsiCMPS(CMPS):
             signal = tf.cast(signal, dtype=tf.complex64)
             H_c = tf.cast(self.H, dtype=tf.complex64)
             R_c = tf.cast(self.R, dtype=tf.complex64)
-            Q = self.delta_t * (-1j * H_c - tf.matmul(R_c, R_c, transpose_a=True) / 2)
-            new_psi = psi
+            # Q = self.delta_t * (-1j * H_c - tf.matmul(R_c, R_c, transpose_a=True) / 2)
+            # new_psi = psi
             new_psi += tf.einsum('ab,cb->ca', Q, psi)
             new_psi += self.delta_t * tf.einsum('a,bc,ac->ab', signal, R_c, psi)
             new_psi = self._normalize_psi(new_psi, axis=1)
