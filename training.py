@@ -1,63 +1,72 @@
 import tensorflow as tf
 import numpy as np
+import tfplot
 
-from model import CMPS
+from tensorflow.contrib.training import HParams
+from model import RhoCMPS
+from data import get_audio
 
-# PARAMETERS
-BOND_D = 10
-dt  = 0.001
-BATCH_SIZE = 8
+DTYPE=tf.float32
+NP_DTYPE=np.float32
 
-# CHOOSE BETWEEN PURE AND MIXED MODEL. True = mixed & False = pure
-discr = False
+tf.set_random_seed(0)
 
-# CHOOSE INITIAL STATE OF THE ANCILLA
-path_is = '_pure'
-#path_is = '_maximally_mixed'
+FLAGS = tf.flags.FLAGS
 
-# LOAD DATA
-dataset = tf.data.TFRecordDataset('/Users/mencia/PhD_local/audioMPS/data/pitch_30.tfrecords')
-
-# PARSE THE RECORD INTO TENSORS
-parse_function = lambda example_proto: tf.parse_single_example(example_proto,
-                                                               {"audio": tf.FixedLenFeature([2**16], dtype=tf.float32)})
-#TODO change to 64000 when I drop the padding in future datasets
-dataset = dataset.map(parse_function)
-
-# CONSUMING TFRecord DATA
-dataset = dataset.batch(batch_size=BATCH_SIZE)
-dataset = dataset.shuffle(buffer_size=24)
-dataset = dataset.repeat()
-iterator = dataset.make_one_shot_iterator()
-batch = iterator.get_next()
-data = batch['audio']
-
-# INITIAL STATE OF ANCILLA IF MIXED
-if discr:
-        if path_is == '_maximally_mixed':
-
-                rho_0 = (1. / BOND_D) * tf.eye(BOND_D, dtype=tf.complex64)
-
-        elif path_is == '_pure':
-
-                pure = np.zeros((BOND_D, BOND_D))
-                pure[0][0] = 1.
-                rho_0 = tf.constant(pure, dtype=tf.complex64)
+# Training flags
+tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization.')
+tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
+tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
+tf.flags.DEFINE_string("logdir", f"../logging/canonical_flows/{FLAGS.hamiltonian}", "Directory to write logs.")
 
 
-# CREATE THE OBJECT our_model
-with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-    our_model = CMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, mixed=discr)
+def main(argv):
 
-# CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
-tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
-tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
-tf.summary.scalar("R_00", tf.reshape(our_model.R[0][0], []))
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001)
+    hparams.parse(FLAGS.hparams)
 
-# global_step: Optional Variable to increment by one after the variables have been updated.
-step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=step)
+    bond_dim = hparams.bond_dim
+    dt = hparams.delta_t
+    minibatch_size = hparams.minibatch_size
 
-# RUN THE TRAINING LOOP
-tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
-                                           str(BATCH_SIZE)+"_discr"+str(discr),save_checkpoint_secs=60)
+    # CHOOSE BETWEEN PURE AND MIXED MODEL. True = mixed & False = pure
+    discr = False
+
+    # CHOOSE INITIAL STATE OF THE ANCILLA
+    path_is = '_pure'
+    #path_is = '_maximally_mixed'
+
+    data = get_audio(hparams)
+
+    # INITIAL STATE OF ANCILLA IF MIXED
+    if discr:
+            if path_is == '_maximally_mixed':
+
+                    rho_0 = (1. / bond_dim) * tf.eye(bond_dim, dtype=tf.complex64)
+
+            elif path_is == '_pure':
+
+                    pure = np.zeros((bond_dim, bond_dim))
+                    pure[0][0] = 1.
+                    rho_0 = tf.constant(pure, dtype=tf.complex64)
+
+
+    # CREATE THE OBJECT our_model
+    with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
+        our_model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data)
+
+    # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
+    tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
+    tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
+    tf.summary.scalar("R_00", tf.reshape(our_model.R[0][0], []))
+
+    # global_step: Optional Variable to increment by one after the variables have been updated.
+    step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+    train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=step)
+
+    # RUN THE TRAINING LOOP
+    tf.contrib.training.train(train_op, logdir="../logging/logging_D" + str(bond_dim) + "_dt" + str(dt) + "_batchsize" +
+                                               str(minibatch_size) + "_discr" + str(discr), save_checkpoint_secs=60)
+
+if __name__ == '__main__':
+    tf.app.run(main)

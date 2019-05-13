@@ -14,10 +14,6 @@ class CMPS:
         self.batch_size = batch_size
         self.data_iterator = data_iterator
 
-        #======================================================
-        # Inital values for parameters to be learned, if given
-        #======================================================
-
         if R is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
                                      initializer=R)
@@ -35,13 +31,13 @@ class CMPS:
         self.H = symmetrize(self.H)
 
 
-class RhoMPS(CMPS):
+class RhoCMPS(CMPS):
     """
         Evolves the density matrix
     """
 
-    def __init__(self, rho_0, *args):
-        super(RhoMPS, self).__init__(*args)
+    def __init__(self, rho_0=None, *args, **kwargs):
+        super(RhoCMPS, self).__init__(*args, **kwargs)
         if rho_0 is not None:
             self.rho_0 = rho_0
         else:
@@ -161,13 +157,13 @@ class RhoMPS(CMPS):
             return tf.multiply(x, x_inv_tr)
 
 
-class PsiMPS(CMPS):
+class PsiCMPS(CMPS):
     """
         Evolves the state
     """
 
-    def __init__(self, *args):
-        super(PsiMPS, self).__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super(PsiCMPS, self).__init__(*args, **kwargs)
         if self.data_iterator is not None:
             self.loss = self._build_loss_psi(data_iterator)
 
