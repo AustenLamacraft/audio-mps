@@ -1,18 +1,17 @@
 import tensorflow as tf
 import numpy as np
-from model import AudioMPS
+from model import CMPS
 
 
 class TestAudioMPS(tf.test.TestCase):
 
-    def testHIsSymmetric(self):
+    def testHIsHermitian(self):
 
-        model = AudioMPS(bond_d=8, delta_t=0.01, batch_size=8)
+        model = CMPS(bond_d=8, delta_t=0.01, batch_size=8)
 
         with self.session() as sess:
             sess.run(tf.global_variables_initializer())
-            H = model.H.eval()
-            self.assertAllClose(H, tf.transpose(H))
+            self.assertAllClose(model.H, tf.transpose(model.H, conjugate=True))
 
 
 if __name__ == '__main__':

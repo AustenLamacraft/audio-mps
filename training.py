@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from model import AudioMPS
+from model import CMPS
 
 # PARAMETERS
 BOND_D = 10
@@ -47,7 +47,7 @@ if discr:
 
 # CREATE THE OBJECT our_model
 with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-    our_model = AudioMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, mixed=discr)
+    our_model = CMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, mixed=discr)
 
 # CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
 tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
