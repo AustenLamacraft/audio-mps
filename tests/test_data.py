@@ -9,10 +9,9 @@ hps = hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001)
 
 class TestGetAudio(tf.test.TestCase):
 
-    def testHIsHermitian(self):
+    def testCorrectBatchSize(self):
 
-        data = get_audio('./data', 'guitar', hps)
-        print(data)
+        data = get_audio('../data', 'guitar', hps)
         with self.cached_session() as sess:
             self.assertEquals(data.eval().shape[0], hps.minibatch_size)
 
