@@ -1,197 +1,79 @@
 import tensorflow as tf
 import numpy as np
+import tfplot
 
-from model import AudioMPS
+from tensorflow.contrib.training import HParams
+from model import RhoCMPS
+from data import get_audio
 
-# PARAMETERS
+DTYPE=tf.float32
+NP_DTYPE=np.float32
 
-BOND_D = 10
-dt  = 0.001
-BATCH_SIZE = 8
+tf.set_random_seed(0)
 
-# COHERENT STATE
+FLAGS = tf.flags.FLAGS
 
-# theta = 2.*np.pi/3
-# phi = 2.*np.pi
-
-# INVERSE FREQUENCY OF THE SINE AND PHASE
-
-#invw = 4
-invw = '_non'
-#phase = 4*np.pi/3
-phase = '_non'
-
-# CHOOSE DATA
-
-#path = '_linear'
-#path = '_linear_and_minuslinear'
-#path = '_linear_and_alphalinear'
-#path = '_quadratic'
-#path = '_gaussian'
-#path = '_sine'
-#path = '_damped_sine_1note'
-#path = '_damped_sine_2note'
-#path = '_damped_sine_multirandomphase'
-#path = '_two_quadratics'
-path = '_sine_multirandomfrequencyandphase'
-#path = '_sine_multirandomphase'
-#path = '_sine_multirandomfrequency'
-
-# CHOOSE INITIAL STATE OF THE ANCILLA
-
-path_is = '_pure'
-#path_is = '_maximally_mixed'
-#path_is = '_coherent_pure'
-
-if path_is is not '_coherent_pure':
-	theta = '_non'
-	phi = '_non'
-
-#if path is not '_sine':
-#invw = '_non'
-#phase = '_non'
-
-# CREATE DATA
-
-if path == '_quadratic':
-
-	INPUT_LENGTH = 10
-	with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-		range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-		data = tf.square(range_stack)
-
-elif path == '_linear':
-
-        INPUT_LENGTH = 10
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = range_stack
-
-elif path == '_linear_and_minuslinear':
-
-        INPUT_LENGTH = 10
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack([tf.range(1,INPUT_LENGTH,dtype=np.float32),-tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = range_stack
-
-elif path == '_linear_and_alphalinear':
-
-        INPUT_LENGTH = 10
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack([tf.range(1,INPUT_LENGTH,dtype=np.float32),-3.*tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = range_stack
+# Training flags
+tf.flags.DEFINE_enum('dataset', 'guitar',
+                     ['damped_sine', 'guitar', 'organ', 'nsynth'],
+                     'Dataset. Must be one of "damped_sine", "guitar", "organ", or "nsynth".')
+tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization.')
+tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
+tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
+tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Directory to write logs.")
 
 
-elif path == '_gaussian':
+def main(argv):
 
-        INPUT_LENGTH = 20
-        dist = tf.distributions.Normal(loc=10.,scale=3.)
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = dist.prob(range_stack)
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001, h_reg=0, r_reg=0)
+    hparams.parse(FLAGS.hparams)
 
-elif path == '_sine':
+    bond_dim = hparams.bond_dim
+    dt = hparams.delta_t
+    minibatch_size = hparams.minibatch_size
 
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack/invw)+np.array([[phase]]))
+    # CHOOSE BETWEEN PURE AND MIXED MODEL. True = mixed & False = pure
+    discr = False
 
-elif path == '_damped_sine_1note':
+    # CHOOSE INITIAL STATE OF THE ANCILLA
+    path_is = '_pure'
+    #path_is = '_maximally_mixed'
 
-        INPUT_LENGTH = 200
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin(range_stack / 4)* tf.exp(-0.03*tf.range(INPUT_LENGTH,dtype=np.float32))
+    data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
-elif path == '_damped_sine_2note':
+    # INITIAL STATE OF ANCILLA IF MIXED
+    if discr:
+            if path_is == '_maximally_mixed':
 
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack / 2)+[[0.],[np.pi]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-                # data = tf.sin((range_stack / 2)+[[],[6.63],[],[]])* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
+                    rho_0 = (1. / bond_dim) * tf.eye(bond_dim, dtype=tf.complex64)
 
-elif path == '_damped_sine_multirandomphase':
+            elif path_is == '_pure':
 
-        qq = np.reshape(np.random.uniform(np.zeros(BATCH_SIZE),2*np.pi*np.ones(BATCH_SIZE)),(BATCH_SIZE,1))
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                #data = tf.sin(range_stack / 2 + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-                data = tf.sin((range_stack / 2)+qq)* tf.exp(-0.1*tf.range(1,INPUT_LENGTH,dtype=np.float32))
-
-elif path == '_sine_multirandomphase':
-
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack / invw) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))
-
-elif path == '_sine_multirandomfrequencyandphase':
-
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack /tf.random_uniform([BATCH_SIZE,1],minval=2,maxval=4)) + tf.random_uniform([BATCH_SIZE,1],minval=0,maxval=2*np.pi))
-
-elif path == '_sine_multirandomfrequency':
-
-        INPUT_LENGTH = 50
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                range_stack = tf.stack(BATCH_SIZE * [tf.range(1,INPUT_LENGTH,dtype=np.float32)])
-                data = tf.sin((range_stack / tf.random_uniform([BATCH_SIZE,1],minval=2,maxval=4))+np.array([[phase]]))
-
-elif path == '_two_quadratics':
-
-        INPUT_LENGTH = 10
-        with tf.variable_scope("model_data", reuse=tf.AUTO_REUSE):
-                data = 0.005*tf.stack([-100+3*tf.square(tf.range(1,INPUT_LENGTH,dtype=np.float32)),100-3*tf.square(tf.range(1,INPUT_LENGTH,dtype=np.float32))])
+                    pure = np.zeros((bond_dim, bond_dim))
+                    pure[0][0] = 1.
+                    rho_0 = tf.constant(pure, dtype=tf.complex64)
 
 
-#INITIAL ANCILLA STATE
 
-if path_is == '_maximally_mixed':
+    with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
+        model = RhoCMPS(bond_dim, dt, minibatch_size, data_iterator=data, rho_0=rho_0)
 
-	rho_0 = (1. / BOND_D) * tf.eye(BOND_D, dtype=tf.complex64)
 
-elif path_is == '_pure':
+    tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
+    tf.summary.scalar("H_00", tf.reshape(model.H[0][0], []))
+    tf.summary.scalar("R_00", tf.reshape(model.R[0][0], []))
 
-	pure = np.zeros((BOND_D,BOND_D))
-	pure[0][0] = 1.
-	rho_0 = tf.constant(pure,dtype=tf.complex64)
+    if FLAGS.visualize:
+        # TODO Create waveform summaries using tfplot. Add purity
+        pass
 
-elif path_is == '_coherent_pure':
+    step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+    train_op = tf.train.AdamOptimizer(1e-3).minimize(model.loss, global_step=step)
 
-    j = (BOND_D - 1) / 2
+    # TODO Unrolling in time?
 
-    mu = tf.range(-j, j + 1, dtype=tf.float32)
-    #####
-    a1 = tf.sqrt(tf.exp(tf.lgamma((2. * j) + 1)) / (tf.exp(tf.lgamma(j + mu + 1)) * tf.exp(tf.lgamma(j - mu + 1))))
-    a2 = (-tf.sin(theta / 2)) ** (j + mu)
-    a3 = (tf.cos(theta / 2)) ** (j - mu)
-    a4 = tf.exp(-1j * tf.cast((j + mu) * phi, tf.complex64))
-    cs = tf.cast(a1 * a2 * a3, tf.complex64) * a4
-    rho_0 = tf.einsum('i,j->ij', tf.conj(cs), cs)
+    tf.contrib.training.train(train_op, save_checkpoint_secs=60,
+                              logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
 
-# CREATE THE OBJECT our_model
-
-with tf.variable_scope("our_model", reuse=tf.AUTO_REUSE):
-    our_model = AudioMPS(BOND_D, dt, BATCH_SIZE, data_iterator=data, rho_0_in=rho_0)
-
-# CREATE SUMMARIES OF THE STUFF WE WANT TO KEEP TRACK OF
-
-tf.summary.scalar("loss_function", tf.reshape(our_model.loss, []))
-tf.summary.scalar("H_00", tf.reshape(our_model.H[0][0], []))
-tf.summary.scalar("R_00", tf.reshape(our_model.R[0][0], []))
-
-# global_step: Optional Variable to increment by one after the variables have been updated.
-
-step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-train_op = tf.train.AdamOptimizer(1e-3).minimize(our_model.loss, global_step=step)
-
-# RUN THE TRAINING LOOP
-
-tf.contrib.training.train(train_op, logdir="../logging/logging_D"+str(BOND_D)+"_dt"+str(dt)+"_batchsize"+
-                                           str(BATCH_SIZE)+path+"_theta"+str(theta)[:6]+"_phi"+
-                                           str(phi)[:6]+path_is+"_invw"+str(invw)+"_phase"+str(phase)[:4],save_checkpoint_secs=60)
+if __name__ == '__main__':
+    tf.app.run(main)
