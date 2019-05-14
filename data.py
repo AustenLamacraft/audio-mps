@@ -29,7 +29,7 @@ def get_audio(datadir, dataset, hps):
 
         # PARSE THE RECORD INTO TENSORS
         parse_function = lambda example_proto: \
-            tf.parse_single_example(example_proto, {"audio": tf.FixedLenFeature([FLAGS.sample_length], dtype=tf.float32)})
+            tf.parse_single_example(example_proto, {"audio": tf.FixedLenFeature([FLAGS.sample_duration], dtype=tf.float32)})
         #TODO change to 64000 when I drop the padding in future datasets
         audio_dataset = audio_dataset.map(parse_function)
 

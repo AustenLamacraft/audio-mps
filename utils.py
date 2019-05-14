@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tfplot
 
 def symmetrize(M):
     with tf.variable_scope("symmetrize"):
@@ -6,5 +7,9 @@ def symmetrize(M):
         M_diag = tf.matrix_band_part(M, 0, 0)
         return M_lower + tf.matrix_transpose(M_lower) - M_diag
 
-def normalize_rho(rho):
-    return rho / tf.trace(rho)
+
+def waveform_plot(wave_form):
+
+    fig, ax = tfplot.subplots(figsize=(3, 3))
+    ax.plot(waveform)
+    return fig
