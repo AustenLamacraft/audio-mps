@@ -39,6 +39,7 @@ class RhoCMPS(CMPS):
     """
     # TODO Switch to increments
     # TODO Initial density matrix must be learnable
+    # TODO Regularize loss with h_reg and r_reg using Frobenius norm
 
 
     def __init__(self, rho_0=None, *args, **kwargs):

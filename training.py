@@ -25,7 +25,7 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 def main(argv):
 
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001)
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001, h_reg=0, r_reg=0)
     hparams.parse(FLAGS.hparams)
 
     bond_dim = hparams.bond_dim
