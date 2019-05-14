@@ -7,9 +7,7 @@ def symmetrize(M):
         M_diag = tf.matrix_band_part(M, 0, 0)
         return M_lower + tf.matrix_transpose(M_lower) - M_diag
 
-
-def waveform_plot(wave_form):
-
+def waveform_plot(waveform):
     fig, ax = tfplot.subplots(figsize=(3, 3))
     ax.plot(waveform)
     return fig
