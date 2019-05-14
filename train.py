@@ -17,6 +17,8 @@ FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_enum('dataset', 'guitar',
                      ['damped_sine', 'guitar', 'organ', 'nsynth'],
                      'Dataset. Must be one of "damped_sine", "guitar", "organ", or "nsynth".')
+
+tf.flags.DEFINE_integer("sample_duration", 2**16, "Duration of samples (as integer).")
 tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization.')
 tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
 tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
