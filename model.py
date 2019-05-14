@@ -15,6 +15,7 @@ class CMPS:
         self.data_iterator = data_iterator
 
         # TODO Switch to complex
+        # TODO Accommodate diagonal
 
         if R is not None:
             self.R = tf.get_variable("R", dtype=tf.float32,
@@ -39,7 +40,8 @@ class RhoCMPS(CMPS):
     """
     # TODO Switch to increments
     # TODO Initial density matrix must be learnable
-    # TODO Regularize loss with h_reg and r_reg using Frobenius norm
+    # TODO Regularize loss with FLAGS.hparams.h_reg and FLAGS.hparams.r_reg using Frobenius norm
+    # (remember different scaling with delta_t)
 
 
     def __init__(self, rho_0=None, *args, **kwargs):
