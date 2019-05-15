@@ -70,17 +70,6 @@ class CMPS:
         self.R = self.Rx + 1j * self.Ry
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
-        #=====================================
-        # Loss function object, if data given
-        #=====================================
-
-        if data_iterator is not None:
-            if mixed:
-                self.loss = self._build_loss_rho(data_iterator)
-            else:
-                self.loss = self._build_loss_psi(data_iterator)
-
-
 class RhoCMPS(CMPS):
     """
         Evolves the density matrix
