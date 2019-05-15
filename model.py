@@ -6,33 +6,6 @@ class CMPS:
     """
     Continuous Matrix Product State.
     """
-
-    # def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H=None, R=None):
-    #
-    #     self.bond_d = bond_d
-    #     self.delta_t = delta_t
-    #     self.batch_size = batch_size
-    #     self.data_iterator = data_iterator
-    #
-    #     # TODO Switch to complex
-    #     # TODO Accommodate diagonal
-    #
-    #     if R is not None:
-    #         self.R = tf.get_variable("R", dtype=tf.float32,
-    #                                  initializer=R)
-    #     else:
-    #         self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
-    #                                  initializer=None)
-    #
-    #     if H is not None:
-    #         self.H = tf.get_variable("H", dtype=tf.float32,
-    #                                  initializer=H)
-    #     else:
-    #         self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
-    #                                  initializer=None)
-    #
-    #     self.H = symmetrize(self.H)
-
     def __init__(self, bond_d, h_reg, r_reg, Asgdt, batch_size, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
 
         self.bond_d = bond_d
