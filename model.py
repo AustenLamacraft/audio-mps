@@ -68,7 +68,6 @@ class CMPS:
         self.Rx = tf.cast(self.Rx, dtype=tf.complex64)
         self.Ry = tf.cast(self.Ry, dtype=tf.complex64)
         self.R = self.Rx + 1j * self.Ry
-        #
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
         #=====================================
