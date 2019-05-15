@@ -16,11 +16,6 @@ class CMPS:
 
         self.data_iterator = data_iterator
 
-        if hparams.initial_rank is not None:
-            self.rank_rho_0 = hparams.initial_rank
-        else:
-            self.rank_rho_0 = hparams.bond_dim
-
         #======================================================
         # Inital values for parameters to be learned, if given
         #======================================================
@@ -56,6 +51,10 @@ class RhoCMPS(CMPS):
     def __init__(self, hparams, Wx_in=None, Wy_in=None, *args, **kwargs):
         super(RhoCMPS, self).__init__(hparams, *args, **kwargs)
 
+        if hparams.initial_rank is not None:
+            self.rank_rho_0 = hparams.initial_rank
+        else:
+            self.rank_rho_0 = hparams.bond_dim
 
         if Wx_in is not None and Wy_in is not None:
             self.Wx = tf.get_variable("Wx", dtype=tf.float32, initializer=Wx_in)
