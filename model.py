@@ -6,15 +6,20 @@ class CMPS:
     """
     Continuous Matrix Product State.
     """
-    def __init__(self, bond_d, h_reg, r_reg, Asgdt, batch_size, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
+    def __init__(self, hparams, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
 
-        self.bond_d = bond_d
-        self.batch_size = batch_size
-        self.rank_rho_0 = bond_d
-        self.h_reg = h_reg
-        self.r_reg = r_reg
-        self.Asgdt = Asgdt
+        self.bond_d = hparams.bond_dim
+        self.batch_size = hparams.minibatch_size
+        self.h_reg = hparams.h_reg
+        self.r_reg = hparams.r_reg
+        self.sigma = hparams.sigma
+
         self.data_iterator = data_iterator
+
+        if hparams.initial_rank is not None:
+            self.rank_rho_0 = hparams.initial_rank
+        else:
+            self.rank_rho_0 = hparams.bond_dim
 
         #======================================================
         # Inital values for parameters to be learned, if given
@@ -28,15 +33,15 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.get_variable("Rx", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.get_variable("Ry", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.get_variable("Rx", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
+            self.Ry = tf.get_variable("Ry", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
 
         if H_in is not None:
 
             self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
 
-            self.H_diag = tf.get_variable("H_diag", shape=[bond_d], dtype=tf.float32, initializer=None)
+            self.H_diag = tf.get_variable("H_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
 
         self.Rx = tf.cast(self.Rx, dtype=tf.complex64)
@@ -48,16 +53,16 @@ class RhoCMPS(CMPS):
     """
         Evolves the density matrix
     """
-    def __init__(self, Wx_in=None, Wy_in=None, *args, **kwargs):
-        super(RhoCMPS, self).__init__(*args, **kwargs)
+    def __init__(self, hparams, Wx_in=None, Wy_in=None, *args, **kwargs):
+        super(RhoCMPS, self).__init__(hparams, *args, **kwargs)
 
 
         if Wx_in is not None and Wy_in is not None:
             self.Wx = tf.get_variable("Wx", dtype=tf.float32, initializer=Wx_in)
             self.Wy = tf.get_variable("Wy", dtype=tf.float32, initializer=Wy_in)
         else:
-            self.Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, bond_d], dtype=tf.float32, initializer=None)
-            self.Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, bond_d], dtype=tf.float32, initializer=None)
+            self.Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
+            self.Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
 
         self.Wx = tf.cast(self.Wx, dtype=tf.complex64)
         self.Wy = tf.cast(self.Wy, dtype=tf.complex64)
@@ -158,7 +163,7 @@ class RhoCMPS(CMPS):
             IR = tf.einsum('a,bc->abc', signal, self.R)
             one_tile = tf.reshape(tf.tile(tf.eye(self.bond_d, dtype=tf.complex64), [num_samples, 1]),
                                   [num_samples, self.bond_d, self.bond_d])
-            U = one_tile + (-1j * H_tile - 0.5 * RR_dag_tile + IR / self.Asgdt)
+            U = one_tile + (-1j * H_tile - 0.5 * RR_dag_tile + IR / self.sigma)
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho
@@ -183,10 +188,10 @@ class PsiCMPS(CMPS):
     """
     # TODO everything I have done for rho, I have not touched PsiCMPS class
 
-    def __init__(self, *args, **kwargs):
-        super(PsiCMPS, self).__init__(*args, **kwargs)
+    def __init__(self, hparams, *args, **kwargs):
+        super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
         if self.data_iterator is not None:
-            self.loss = self._build_loss_psi(data_iterator)
+            self.loss = self._build_loss_psi(self.data_iterator)
 
     # ====================
     # Psi methods-PUBLIC

@@ -28,15 +28,15 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 def main(argv):
 
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001, h_reg=0, r_reg=0)
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
+                      sigma=1, h_reg=0, r_reg=0, initial_rank=None)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-        model = RhoCMPS(bond_d=hparams.bond_dim, delta_t=hparams.delta_t,
-                        batch_size=hparams.minibatch_size, data_iterator=data)
+        model = RhoCMPS(hparams=hparams, data_iterator=data)
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("loss_function", tf.reshape(model.loss, []))

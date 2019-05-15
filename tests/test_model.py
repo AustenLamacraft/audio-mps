@@ -2,12 +2,16 @@ import tensorflow as tf
 import numpy as np
 from model import CMPS, RhoCMPS, PsiCMPS
 
+from tensorflow.contrib.training import HParams
+hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
+                  sigma=1, h_reg=0, r_reg=0, initial_rank=None)
+
 
 class TestCMPS(tf.test.TestCase):
 
     def testHIsHermitian(self):
 
-        model = CMPS(bond_d=8, delta_t=0.01, batch_size=8)
+        model = CMPS(hparams)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -18,7 +22,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
     def testRhoIsNormalized(self):
 
-        model = RhoCMPS(bond_d=8, delta_t=0.01, batch_size=8)
+        model = RhoCMPS(hparams)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
