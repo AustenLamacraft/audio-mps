@@ -14,6 +14,7 @@ class CMPS:
         self.h_reg = h_reg
         self.r_reg = r_reg
         self.Asgdt = Asgdt
+        self.data_iterator = data_iterator
 
         #======================================================
         # Inital values for parameters to be learned, if given
