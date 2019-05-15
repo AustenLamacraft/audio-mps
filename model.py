@@ -7,51 +7,110 @@ class CMPS:
     Continuous Matrix Product State.
     """
 
-    def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H=None, R=None):
+    # def __init__(self, bond_d, delta_t, batch_size, data_iterator=None, H=None, R=None):
+    #
+    #     self.bond_d = bond_d
+    #     self.delta_t = delta_t
+    #     self.batch_size = batch_size
+    #     self.data_iterator = data_iterator
+    #
+    #     # TODO Switch to complex
+    #     # TODO Accommodate diagonal
+    #
+    #     if R is not None:
+    #         self.R = tf.get_variable("R", dtype=tf.float32,
+    #                                  initializer=R)
+    #     else:
+    #         self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
+    #                                  initializer=None)
+    #
+    #     if H is not None:
+    #         self.H = tf.get_variable("H", dtype=tf.float32,
+    #                                  initializer=H)
+    #     else:
+    #         self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
+    #                                  initializer=None)
+    #
+    #     self.H = symmetrize(self.H)
+
+    def __init__(self, bond_d, h_reg, r_reg, Asgdt, batch_size, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
 
         self.bond_d = bond_d
-        self.delta_t = delta_t
         self.batch_size = batch_size
-        self.data_iterator = data_iterator
+        self.rank_rho_0 = bond_d
+        self.h_reg = h_reg
+        self.r_reg = r_reg
+        self.Asgdt = Asgdt
 
-        # TODO Switch to complex
-        # TODO Accommodate diagonal
+        #======================================================
+        # Inital values for parameters to be learned, if given
+        #======================================================
 
-        if R is not None:
-            self.R = tf.get_variable("R", dtype=tf.float32,
-                                     initializer=R)
+        # Training variables cannot be complex
+
+        if Rx_in is not None and Ry_in is not None:
+
+            self.Rx = tf.get_variable("Rx", dtype=tf.float32, initializer=Rx_in)
+            self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
-            self.R = tf.get_variable("R", shape=[bond_d, bond_d], dtype=tf.float32,
-                                     initializer=None)
 
-        if H is not None:
-            self.H = tf.get_variable("H", dtype=tf.float32,
-                                     initializer=H)
+            self.Rx = tf.get_variable("Rx", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
+            self.Ry = tf.get_variable("Ry", shape=[bond_d, bond_d], dtype=tf.float32, initializer=None)
+
+        if H_in is not None:
+
+            self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
-            self.H = tf.get_variable("H", shape=[bond_d, bond_d], dtype=tf.float32,
-                                     initializer=None)
 
-        self.H = symmetrize(self.H)
+            self.H_diag = tf.get_variable("H_diag", shape=[bond_d], dtype=tf.float32, initializer=None)
+
+
+        self.Rx = tf.cast(self.Rx, dtype=tf.complex64)
+        self.Ry = tf.cast(self.Ry, dtype=tf.complex64)
+        self.R = self.Rx + 1j * self.Ry
+        #
+        self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
+
+        #=====================================
+        # Loss function object, if data given
+        #=====================================
+
+        if data_iterator is not None:
+            if mixed:
+                self.loss = self._build_loss_rho(data_iterator)
+            else:
+                self.loss = self._build_loss_psi(data_iterator)
 
 
 class RhoCMPS(CMPS):
     """
         Evolves the density matrix
     """
-    # TODO Switch to increments
-    # TODO Initial density matrix must be learnable
-    # TODO Regularize loss with FLAGS.hparams.h_reg and FLAGS.hparams.r_reg using Frobenius norm
-    # (remember different scaling with delta_t)
-
-
-    def __init__(self, rho_0=None, *args, **kwargs):
+    def __init__(self, Wx_in=None, Wy_in=None, *args, **kwargs):
         super(RhoCMPS, self).__init__(*args, **kwargs)
-        if rho_0 is not None:
-            self.rho_0 = rho_0
+
+
+        if Wx_in is not None and Wy_in is not None:
+            self.Wx = tf.get_variable("Wx", dtype=tf.float32, initializer=Wx_in)
+            self.Wy = tf.get_variable("Wy", dtype=tf.float32, initializer=Wy_in)
         else:
-            self.rho_0 = (1. / self.bond_d) * tf.eye(self.bond_d, dtype=tf.complex64)
+            self.Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, bond_d], dtype=tf.float32, initializer=None)
+            self.Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, bond_d], dtype=tf.float32, initializer=None)
+
+        self.Wx = tf.cast(self.Wx, dtype=tf.complex64)
+        self.Wy = tf.cast(self.Wy, dtype=tf.complex64)
+        self.W = self.Wx + 1j * self.Wy
+        self.rho_0 = tf.matmul(self.W, self.W, adjoint_a=True)
+        self.rho_0 = self.rho_0 / tf.trace(self.rho_0)
+
         if self.data_iterator is not None:
             self.loss = self._build_loss_rho(self.data_iterator)
+
+    # ====================
+    # Rho methods-PUBLIC
+    # ====================
+
+    # TODO all the public methods are from the old version
 
     def rho_evolve_with_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
@@ -64,7 +123,7 @@ class RhoCMPS(CMPS):
     def rho_evolve_with_sampling(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="rho_scan")
         return rho
@@ -72,7 +131,7 @@ class RhoCMPS(CMPS):
     def purity(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="purity_scan")
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
@@ -80,82 +139,73 @@ class RhoCMPS(CMPS):
     def sample_rho(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         return tf.transpose(samples, [1, 0])
-    #
-    def sample_time_evolved_rho0(self, num_samples, length, data, temp=1):
-        """The data is only used to time evolve one step"""
-        batch_zeros = tf.zeros([num_samples])
-        rho_0 = tf.stack(num_samples * [self.rho_0])
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        rho_0 = self._update_ancilla_rho(rho_0, data[0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
-        rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros), name="sample_scan_time_evolved")
-        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
-        return tf.transpose(samples, [1, 0])
 
-        # =====================
-        # Rho methods-PRIVATE
-        # =====================
+    # =====================
+    # Rho methods-PRIVATE
+    # =====================
 
     def _build_loss_rho(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])
         rho_0 = tf.stack(self.batch_size * [self.rho_0])
         loss = batch_zeros
+        # We switch to increments
+        data = data[:, 1:] - data[:, :-1]
         data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
-        rho_0 = self._update_ancilla_rho(rho_0, data[0])
-        data = data[1:]
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
-        return tf.reduce_mean(loss)
+        return tf.reduce_mean(loss) + self.h_reg * tf.reduce_sum(tf.square(self.H_diag)) + \
+               self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R)*self.R))
 
     def _rho_update(self, rho_and_loss, signal):
+        # TODO change the name of the first argument
         rho, loss = rho_and_loss
         rho = self._update_ancilla_rho(rho, signal)
+        rho = self._normalize_rho(rho)
         return rho, loss
 
     def _rho_and_loss_update(self, rho_and_loss, signal):
         rho, loss = rho_and_loss
-        loss += self._inc_loss_rho(rho, signal)
         rho = self._update_ancilla_rho(rho, signal)
+        loss += self._inc_loss_rho(rho, signal)
+        rho = self._normalize_rho(rho)
         return rho, loss
 
     def _rho_and_sample_update(self, rho_and_sample, noise):
+        #TODO think how to do the sampling
         rho, last_sample = rho_and_sample
         new_sample = self._expectation_rho(rho) + noise
         rho = self._update_ancilla_rho(rho, new_sample)
         return rho, new_sample
 
     def _inc_loss_rho(self, rho, signal):
-        return (signal - self._expectation_rho(rho)) ** 2 / 2
+        return - tf.log(self._expectation_rho(rho))
 
     def _update_ancilla_rho(self, rho, signal):
+        # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            H_c = tf.cast(self.H, dtype=tf.complex64)
-            R_c = tf.cast(self.R, dtype=tf.complex64)
-            Q = self.delta_t * (-1j * H_c - tf.matmul(R_c, R_c, transpose_a=True) / 2)
-            oneQdagdt = tf.add(tf.eye(self.bond_d, dtype=tf.complex64), tf.linalg.adjoint(Q))
-            IRdagdt = self.delta_t * tf.einsum('a,bc->abc', signal, tf.linalg.adjoint(R_c))
-            new_rho = rho
-            new_rho += tf.einsum('ab,cbd->cad', Q, rho)
-            new_rho += self.delta_t * tf.einsum('a,bc,ace->abe', signal, R_c, rho)
-            a1 = tf.einsum('abe,ec->abc', new_rho, oneQdagdt)
-            a2 = tf.einsum('abe,aec->abc', new_rho, IRdagdt)
-            new_rho = a1 + a2
-            new_rho = self._normalize_rho(new_rho)
+            num_samples = tf.size(signal)
+            H_tile = tf.reshape(tf.tile(self.H, [num_samples, 1]), [num_samples, self.bond_d, self.bond_d])
+            RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
+            RR_dag_tile = tf.reshape(tf.tile(RR_dag, [num_samples, 1]), [num_samples, self.bond_d, self.bond_d])
+            IR = tf.einsum('a,bc->abc', signal, self.R)
+            one_tile = tf.reshape(tf.tile(tf.eye(self.bond_d, dtype=tf.complex64), [num_samples, 1]),
+                                  [num_samples, self.bond_d, self.bond_d])
+            U = one_tile + (-1j * H_tile - 0.5 * RR_dag_tile + IR / self.Asgdt)
+            U_dag = tf.linalg.adjoint(U)
+            new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho
 
     def _expectation_rho(self, rho):
         with tf.variable_scope("expectation"):
-            R_c = tf.cast(self.R, dtype=tf.complex64)
-            x = tf.add(R_c, tf.linalg.adjoint(R_c))
+            x = tf.add(self.R, tf.linalg.adjoint(self.R))
             exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
-            return tf.real(exp)  # Conveniently returns a float
+            return tf.real(exp)
 
     def _normalize_rho(self, x, epsilon=1e-12):
         with tf.variable_scope("normalize"):
@@ -169,7 +219,7 @@ class PsiCMPS(CMPS):
     """
         Evolves the state
     """
-    # TODO Switch to increments
+    # TODO everything I have done for rho, I have not touched PsiCMPS class
 
     def __init__(self, *args, **kwargs):
         super(PsiCMPS, self).__init__(*args, **kwargs)
