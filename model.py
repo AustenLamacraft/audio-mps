@@ -189,8 +189,19 @@ class PsiCMPS(CMPS):
     """
     # TODO everything I have done for rho, I have not touched PsiCMPS class
 
-    def __init__(self, hparams, *args, **kwargs):
+    def __init__(self, hparams, psi_x_in=None, psi_y_in=None, *args, **kwargs):
         super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
+
+        if psi_x_in is not None and psi_y_in is not None:
+            self.psi_x = tf.get_variable("psi_x", dtype=tf.float32, initializer=psi_x_in)
+            self.psi_y = tf.get_variable("psi_y", dtype=tf.float32, initializer=psi_y_in)
+        else:
+            self.psi_x = tf.get_variable("psi_x", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            self.psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+
+        self.psi_0 = tf.cast(self.psi_x, dtype=tf.complex64) + 1j * tf.cast(self.psi_y, dtype=tf.complex64)
+        self.psi_0 = self._normalize_psi(self.psi_0)
+
         if self.data_iterator is not None:
             self.loss = self._build_loss_psi(self.data_iterator)
 
@@ -200,17 +211,21 @@ class PsiCMPS(CMPS):
 
     def psi_evolve_with_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
+
+        # TODO change to learned psi_0
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
+
+        #TODO introduce increments
         data = tf.transpose(data, [1, 0])
         psi, _ = tf.scan(self._psi_update, data,
                          initializer=(psi_0, batch_zeros), name="psi_scan_data_evolved")
         return psi
 
-    def sample_time_evolved_psi0(self, num_samples, length, data, temp=1):
+    def sample_time_evolved_psi0(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
+        # TODO change to learned psi_0
         psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        psi_0 = self._update_ancilla_psi(psi_0, data[0])
+        # TODO change to learned psi_0
         noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
         psi, samples = tf.scan(self._psi_and_sample_update, noise,
                                initializer=(psi_0, batch_zeros), name="sample_scan")
