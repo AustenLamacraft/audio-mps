@@ -42,6 +42,7 @@ def main(argv):
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
+        # TODO Add other loss terms to summaries
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred

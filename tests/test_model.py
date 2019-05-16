@@ -5,7 +5,7 @@ from data import get_audio
 
 from tensorflow.contrib.training import HParams
 hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
-                  sigma=1, h_reg=0, r_reg=0, initial_rank=3)
+                  sigma=1, h_reg=0, r_reg=0, initial_rank=3, A=1)
 
 
 class TestCMPS(tf.test.TestCase):
@@ -39,7 +39,7 @@ class TestRhoCMPS(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(model.H, np.diag(test_H_diag))
 
-    def testTrivialUpdate(self):
+    def testTrivialUpdateOfAncilla(self):
         """
         Update with H=R=0
         """
