@@ -7,6 +7,8 @@ from tensorflow.contrib.training import HParams
 hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
                   sigma=1, h_reg=0, r_reg=0, initial_rank=3, A=1)
 
+tf.flags.DEFINE_integer("sample_duration", 2**8, "Duration of samples (as integer).")
+
 
 class TestCMPS(tf.test.TestCase):
 
@@ -20,6 +22,7 @@ class TestCMPS(tf.test.TestCase):
 
 
 class TestRhoCMPS(tf.test.TestCase):
+
 
     def testRho0IsADensityMatrix(self):
 

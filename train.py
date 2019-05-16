@@ -49,6 +49,8 @@ def main(argv):
             waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data)
             tf.summary.image("waveform", waveform_op)
 
+        tf.summary.audio("samples", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
+
     step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
     train_op = tf.train.AdamOptimizer(1e-3).minimize(model.loss, global_step=step)
 
