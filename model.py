@@ -28,15 +28,15 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.get_variable("Rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.get_variable("Ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
 
         if H_in is not None:
 
             self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
 
-            self.H_diag = tf.get_variable("H_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
