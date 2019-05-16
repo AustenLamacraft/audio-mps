@@ -13,14 +13,14 @@ class CMPS:
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
         self.sigma = hparams.sigma
+        self.A = hparams.A
+        self.delta_t = hparams.delta_t
 
         self.data_iterator = data_iterator
 
         #======================================================
-        # Inital values for parameters to be learned, if given
+        # Training variables (cannot be complex)
         #======================================================
-
-        # Training variables cannot be complex
 
         if Rx_in is not None and Ry_in is not None:
 
@@ -28,8 +28,8 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.get_variable("Rx", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.get_variable("Ry", shape=[self.bond_d, self.bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.get_variable("Rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Ry = tf.get_variable("Ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
 
         if H_in is not None:
 
@@ -38,10 +38,7 @@ class CMPS:
 
             self.H_diag = tf.get_variable("H_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
-
-        self.Rx = tf.cast(self.Rx, dtype=tf.complex64)
-        self.Ry = tf.cast(self.Ry, dtype=tf.complex64)
-        self.R = self.Rx + 1j * self.Ry
+        self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
 class RhoCMPS(CMPS):
@@ -63,11 +60,7 @@ class RhoCMPS(CMPS):
             self.Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
             self.Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
 
-        self.Wx = tf.cast(self.Wx, dtype=tf.complex64)
-        self.Wy = tf.cast(self.Wy, dtype=tf.complex64)
-        self.W = self.Wx + 1j * self.Wy
-        self.rho_0 = tf.matmul(self.W, self.W, adjoint_a=True)
-        self.rho_0 = self.rho_0 / tf.trace(self.rho_0)
+        self.rho_0 = self._rho_init()
 
         if self.data_iterator is not None:
             self.loss = self._build_loss_rho(self.data_iterator)
@@ -76,11 +69,11 @@ class RhoCMPS(CMPS):
     # Rho methods-PUBLIC
     # ====================
 
-    # TODO all the public methods are from the old version
-
     def rho_evolve_with_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
+        # We switch to increments to evolve rho
+        data = data[:, 1:] - data[:, :-1]
         data = tf.transpose(data, [1, 0])
         rho, _ = tf.scan(self._rho_update, data,
                          initializer=(rho_0, batch_zeros), name="rho_scan_data_evolved")
@@ -89,7 +82,7 @@ class RhoCMPS(CMPS):
     def rho_evolve_with_sampling(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
+        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="rho_scan")
         return rho
@@ -97,7 +90,7 @@ class RhoCMPS(CMPS):
     def purity(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
+        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="purity_scan")
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
@@ -105,15 +98,24 @@ class RhoCMPS(CMPS):
     def sample_rho(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp))
+        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
         return tf.transpose(samples, [1, 0])
 
     # =====================
     # Rho methods-PRIVATE
     # =====================
+
+    def _rho_init(self):
+        Wx = tf.cast(self.Wx, dtype=tf.complex64)
+        Wy = tf.cast(self.Wy, dtype=tf.complex64)
+        W = Wx + 1j * Wy
+        rho_0 = tf.matmul(W, W, adjoint_a=True)
+        rho_0 = rho_0 / tf.trace(rho_0)
+        return rho_0
 
     def _build_loss_rho(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])
@@ -124,45 +126,45 @@ class RhoCMPS(CMPS):
         data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
-        return tf.reduce_mean(loss) + self.h_reg * tf.reduce_sum(tf.square(self.H_diag)) + \
+        L2_regularization = self.h_reg * tf.reduce_sum(tf.square(self.H_diag)) + \
                self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R)*self.R))
+        return tf.reduce_sum(loss) + L2_regularization
 
     def _rho_update(self, rho_and_loss, signal):
         # TODO change the name of the first argument
         rho, loss = rho_and_loss
-        rho = self._update_ancilla_rho(rho, signal)
+        rho = self._update_ancilla_rho(rho, signal) # signal is the increment
         rho = self._normalize_rho(rho)
         return rho, loss
 
     def _rho_and_loss_update(self, rho_and_loss, signal):
         rho, loss = rho_and_loss
         rho = self._update_ancilla_rho(rho, signal)
-        loss += self._inc_loss_rho(rho, signal)
+        loss += self._inc_loss_rho(rho)
         rho = self._normalize_rho(rho)
         return rho, loss
 
     def _rho_and_sample_update(self, rho_and_sample, noise):
-        #TODO think how to do the sampling
         rho, last_sample = rho_and_sample
-        new_sample = self._expectation_rho(rho) + noise
-        rho = self._update_ancilla_rho(rho, new_sample)
+        new_sample = last_sample + self._expectation_rho(rho) * self.A * self.delta_t + noise
+        increment = new_sample - last_sample
+        rho = self._update_ancilla_rho(rho, increment) # Note update with increment
+        rho = self._normalize_rho(rho)
         return rho, new_sample
 
-    def _inc_loss_rho(self, rho, signal):
-        return - tf.log(self._expectation_rho(rho))
+    def _inc_loss_rho(self, rho):
+        return - tf.log(tf.real(tf.trace(rho)))
 
     def _update_ancilla_rho(self, rho, signal):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            num_samples = tf.size(signal)
-            H_tile = tf.reshape(tf.tile(self.H, [num_samples, 1]), [num_samples, self.bond_d, self.bond_d])
+            H = tf.stack(self.batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag_tile = tf.reshape(tf.tile(RR_dag, [num_samples, 1]), [num_samples, self.bond_d, self.bond_d])
+            RR_dag = tf.stack(self.batch_size * [RR_dag])
             IR = tf.einsum('a,bc->abc', signal, self.R)
-            one_tile = tf.reshape(tf.tile(tf.eye(self.bond_d, dtype=tf.complex64), [num_samples, 1]),
-                                  [num_samples, self.bond_d, self.bond_d])
-            U = one_tile + (-1j * H_tile - 0.5 * RR_dag_tile + IR / self.sigma)
+            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho

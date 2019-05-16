@@ -27,13 +27,15 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 
 def main(argv):
-
+    # I introduced the hyperparameter A, which is set to 1. by default. The meaning of sigma is not Asgsq{dt} anymore.
+    # sigma now is the strength of the noise.
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
-                      sigma=1, h_reg=0, r_reg=0, initial_rank=None)
+                      sigma=1, h_reg=0, r_reg=0, initial_rank=None, A=1)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
+        #TODO put it back
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
         model = RhoCMPS(hparams=hparams, data_iterator=data)
