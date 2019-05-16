@@ -34,6 +34,7 @@ def main(argv):
 
     with tf.variable_scope("data"):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
+        #TODO put it back
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
         model = RhoCMPS(hparams=hparams, data_iterator=data)
