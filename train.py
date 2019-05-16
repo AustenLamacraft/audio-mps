@@ -56,6 +56,7 @@ def main(argv):
             tf.summary.image("waveform", waveform_op)
 
         tf.summary.audio("samples", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
+        tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
 
     step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
     train_op = tf.train.AdamOptimizer(1e-3).minimize(total_loss, global_step=step)
