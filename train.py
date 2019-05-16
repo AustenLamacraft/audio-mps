@@ -4,6 +4,7 @@ import tfplot
 
 from tensorflow.contrib.training import HParams
 from model import RhoCMPS
+from model import PsiCMPS
 from data import get_audio
 from utils import waveform_plot
 
@@ -35,10 +36,10 @@ def main(argv):
 
     with tf.variable_scope("data"):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
-        #TODO put it back
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-        model = RhoCMPS(hparams=hparams, data_iterator=data)
+        # model = RhoCMPS(hparams=hparams, data_iterator=data)
+        model = PsiCMPS(hparams=hparams, data_iterator=data)
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
