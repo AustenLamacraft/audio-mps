@@ -23,6 +23,13 @@ class TestCMPS(tf.test.TestCase):
 
 class TestRhoCMPS(tf.test.TestCase):
 
+    def testLossNotNaN(self):
+        data = get_audio(None, 'damped_sine', hparams)
+        model = RhoCMPS(hparams, data_iterator=data)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            self.assertNotEqual(model.loss.eval(), np.nan)
 
     def testRho0IsADensityMatrix(self):
 
