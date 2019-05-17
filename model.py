@@ -276,6 +276,7 @@ class PsiCMPS(CMPS):
             new_psi = psi
             new_psi += tf.einsum('ab,cb->ca', Q, psi)
             new_psi += self.delta_t * tf.einsum('a,bc,ac->ab', signal, R_c, psi)
+            # TODO remove normalization
             new_psi = self._normalize_psi(new_psi, axis=1)
             return new_psi
 
