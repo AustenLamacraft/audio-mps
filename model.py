@@ -211,25 +211,22 @@ class PsiCMPS(CMPS):
 
     def psi_evolve_with_data(self, num_samples, data):
         batch_zeros = tf.zeros([num_samples])
-
-        # TODO change to learned psi_0
-        psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
-
-        #TODO introduce increments
+        psi_0 = tf.stack(num_samples * [self.psi_0])
+        # We switch to increments to evolve rho
+        data = data[:, 1:] - data[:, :-1]
         data = tf.transpose(data, [1, 0])
         psi, _ = tf.scan(self._psi_update, data,
                          initializer=(psi_0, batch_zeros), name="psi_scan_data_evolved")
         return psi
 
-    def sample_time_evolved_psi0(self, num_samples, length, temp=1):
+    def sample_psi(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
-        # TODO change to learned psi_0
-        psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
-        # TODO change to learned psi_0
-        noise = tf.random_normal([length, num_samples], stddev=np.sqrt(temp / self.delta_t))
+        psi_0 = tf.stack(num_samples * [self.psi_0])
+        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
         psi, samples = tf.scan(self._psi_and_sample_update, noise,
                                initializer=(psi_0, batch_zeros), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
         return tf.transpose(samples, [1, 0])
 
     # =====================
@@ -245,27 +242,32 @@ class PsiCMPS(CMPS):
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
         _, loss = tf.foldl(self._psi_and_loss_update, data,
                            initializer=(psi_0, loss), name="loss_fold")
-        return tf.reduce_sum(loss)
+        return tf.reduce_mean(loss)
 
     def _psi_update(self, psi_and_loss, signal):
+        # TODO change name of first argument
         psi, loss = psi_and_loss
-        psi = self._update_ancilla_psi(psi, signal)
+        psi = self._update_ancilla_psi(psi, signal) # signal is the increment
+        psi = self._normalize_psi(psi)
         return psi, loss
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
-        loss += self._inc_loss_psi(psi)
         psi = self._update_ancilla_psi(psi, signal)
+        loss += self._inc_loss_psi(psi)
+        psi = self._normalize_psi(psi)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
         psi, last_sample = psi_and_sample
-        new_sample = self._expectation_RplusRdag_psi(psi) + noise
-        psi = self._update_ancilla_psi(psi, new_sample)
+        new_sample = last_sample + self._expectation_RplusRdag_psi(psi) * self.A * self.delta_t + noise
+        increment = new_sample - last_sample
+        psi = self._update_ancilla_psi(psi, increment)  # Note update with increment
+        psi = self._normalize_psi(psi)
         return psi, new_sample
 
     def _inc_loss_psi(self, psi):
-        return - tf.log(_norm_square_psi(psi))
+        return - tf.log(self._norm_square_psi(psi))
 
     def _norm_square_psi(self, psi):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
