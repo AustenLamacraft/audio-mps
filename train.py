@@ -57,6 +57,7 @@ def main(argv):
                                     + hparams.r_reg * r_l2sqnorm
 
     with tf.variable_scope("summaries"):
+        tf.summary.scalar("sigma", tf.cast(model.sigma, dtype=tf.float32))
         tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
         tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
 

@@ -12,9 +12,11 @@ class CMPS:
         self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
-        self.sigma = hparams.sigma
         self.A = hparams.A
         self.delta_t = hparams.delta_t
+
+        self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
+        self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
 
         self.data_iterator = data_iterator
 

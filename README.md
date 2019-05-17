@@ -27,5 +27,6 @@ It imports reader.py to make the dataset.
 ## Todo
 
 1. Sampling
+1. What about initialization? Glorot variance depends on size.
 1. Monitor change of state to see if it is small
 1. Exploring latent space
