@@ -146,7 +146,7 @@ class RhoCMPS(CMPS):
 
     def _rho_and_sample_update(self, rho_and_sample, noise):
         rho, last_sample = rho_and_sample
-        new_sample = last_sample + self._expectation_rho(rho) * self.A * self.delta_t + noise
+        new_sample = last_sample + self._expectation_RplusRdag_rho(rho) * self.A * self.delta_t + noise
         increment = new_sample - last_sample
         rho = self._update_ancilla_rho(rho, increment) # Note update with increment
         rho = self._normalize_rho(rho)
@@ -169,7 +169,7 @@ class RhoCMPS(CMPS):
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho
 
-    def _expectation_rho(self, rho):
+    def _expectation_RplusRdag_rho(self, rho):
         with tf.variable_scope("expectation"):
             x = tf.add(self.R, tf.linalg.adjoint(self.R))
             exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
@@ -254,36 +254,39 @@ class PsiCMPS(CMPS):
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
-        loss += self._inc_loss_psi(psi, signal)
+        loss += self._inc_loss_psi(psi)
         psi = self._update_ancilla_psi(psi, signal)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
         psi, last_sample = psi_and_sample
-        new_sample = self._expectation_psi(psi) + noise
+        new_sample = self._expectation_RplusRdag_psi(psi) + noise
         psi = self._update_ancilla_psi(psi, new_sample)
         return psi, new_sample
 
-    def _inc_loss_psi(self, psi, signal):
-        return (signal - self._expectation_psi(psi)) ** 2 / 2
+    def _inc_loss_psi(self, psi):
+        return - tf.log(_norm_square_psi(psi))
+
+    def _norm_square_psi(self, psi):
+        exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
+        return tf.real(exp)
 
     def _update_ancilla_psi(self, psi, signal):
+        # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            H_c = tf.cast(self.H, dtype=tf.complex64)
-            R_c = tf.cast(self.R, dtype=tf.complex64)
-            Q = self.delta_t * (-1j * H_c - tf.matmul(R_c, R_c, transpose_a=True) / 2)
-            new_psi = psi
-            new_psi += tf.einsum('ab,cb->ca', Q, psi)
-            new_psi += self.delta_t * tf.einsum('a,bc,ac->ab', signal, R_c, psi)
-            # TODO remove normalization
-            new_psi = self._normalize_psi(new_psi, axis=1)
+            H = tf.stack(self.batch_size * [self.H])
+            RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
+            RR_dag = tf.stack(self.batch_size * [RR_dag])
+            IR = tf.einsum('a,bc->abc', signal, self.R)
+            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
+            new_psi = tf.einsum('abc,ac->ab', U, psi)
             return new_psi
 
-    def _expectation_psi(self, psi):
+    def _expectation_RplusRdag_psi(self, psi):
         with tf.variable_scope("expectation"):
-            R_c = tf.cast(self.R, dtype=tf.complex64)
-            exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), R_c, psi)
+            exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
             return 2 * tf.real(exp)  # Conveniently returns a float
 
     def _normalize_psi(self, x, axis=None, epsilon=1e-12):
