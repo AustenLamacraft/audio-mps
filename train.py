@@ -14,6 +14,11 @@ tf.set_random_seed(0)
 
 FLAGS = tf.flags.FLAGS
 
+# Model flags
+tf.flags.DEFINE_enum('mps_model', 'rho_mps',
+                     ['rho_mps', 'psi_mps'],
+                     'MPS mdoel. Must be one of "rho_mps" or "psi_mps".')
+
 # Training flags
 tf.flags.DEFINE_enum('dataset', 'damped_sine',
                      ['damped_sine', 'guitar', 'organ', 'nsynth'],
@@ -39,8 +44,10 @@ def main(argv):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-        model = RhoCMPS(hparams=hparams, data_iterator=data)
-        # model = PsiCMPS(hparams=hparams, data_iterator=data)
+        if FLAGS.mps_model == 'rho_mps':
+            model = RhoCMPS(hparams=hparams, data_iterator=data)
+        else:
+            model = PsiCMPS(hparams=hparams, data_iterator=data)
 
     with tf.variable_scope("total_loss"):
         total_loss = model.loss + model.h_loss + model.r_loss
