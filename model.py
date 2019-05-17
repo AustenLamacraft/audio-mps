@@ -28,18 +28,25 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.get_variable("Rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.get_variable("Ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
 
         if H_in is not None:
 
             self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
 
-            self.H_diag = tf.get_variable("H_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
+
+        # ======================================================
+        # Define L2 regularization
+        # ======================================================
+
+        self.h_loss = self.h_reg * tf.reduce_sum(tf.square(self.H_diag))
+        self.r_loss = self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R) * self.R))
 
 class RhoCMPS(CMPS):
     """
@@ -126,9 +133,7 @@ class RhoCMPS(CMPS):
         data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
-        L2_regularization = self.h_reg * tf.reduce_sum(tf.square(self.H_diag)) + \
-               self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R)*self.R))
-        return tf.reduce_sum(loss) + L2_regularization
+        return tf.reduce_mean(loss)
 
     def _rho_update(self, rho_and_loss, signal):
         # TODO change the name of the first argument
