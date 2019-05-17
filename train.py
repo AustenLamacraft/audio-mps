@@ -35,7 +35,7 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 def main(argv):
     # I introduced the hyperparameter A, which is set to 1. by default. The meaning of sigma is not Asgsq{dt} anymore.
     # sigma now is the strength of the noise.
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.001,
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2,
                       initial_rank=None, A=1)
     hparams.parse(FLAGS.hparams)
@@ -57,14 +57,19 @@ def main(argv):
                                     + hparams.r_reg * r_l2sqnorm
 
     with tf.variable_scope("summaries"):
+        tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
+        tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
+
+        gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
+        tf.summary.scalar("gr_decay_time", 1 / gr_rate)
+
         tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
-        tf.summary.scalar("h_l2norm", tf.reshape(h_l2sqnorm, []))
-        tf.summary.scalar("r_l2norm", tf.reshape(r_l2sqnorm, []))
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
+
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
-            waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data)
+            waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
             tf.summary.image("waveform", waveform_op)
 
         tf.summary.audio("samples", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
