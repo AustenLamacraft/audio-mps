@@ -41,12 +41,6 @@ class CMPS:
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
-        # ======================================================
-        # Define L2 regularization
-        # ======================================================
-
-        self.h_loss = self.h_reg * tf.reduce_sum(tf.square(self.H_diag))
-        self.r_loss = self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R) * self.R))
 
 class RhoCMPS(CMPS):
     """

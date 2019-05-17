@@ -49,13 +49,17 @@ def main(argv):
         else:
             model = PsiCMPS(hparams=hparams, data_iterator=data)
 
+        h_l2sqnorm = tf.reduce_sum(tf.square(model.H_diag))
+        r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
+
     with tf.variable_scope("total_loss"):
-        total_loss = model.loss + model.h_loss + model.r_loss
+        total_loss = model.loss + hparams.h_reg * h_l2sqnorm \
+                                    + hparams.r_reg * r_l2sqnorm
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
-        tf.summary.scalar("h_loss", tf.reshape(model.h_loss, []))
-        tf.summary.scalar("r_loss", tf.reshape(model.r_loss, []))
+        tf.summary.scalar("h_l2norm", tf.reshape(h_l2sqnorm, []))
+        tf.summary.scalar("r_l2norm", tf.reshape(r_l2sqnorm, []))
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
         if FLAGS.visualize:
