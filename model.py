@@ -238,14 +238,14 @@ class PsiCMPS(CMPS):
 
     def _build_loss_psi(self, data):
         batch_zeros = tf.zeros_like(data[:, 0])
-        psi_0 = tf.one_hot(tf.cast(batch_zeros, dtype=tf.int32), self.bond_d, dtype=tf.complex64)
+        psi_0 = tf.stack(self.batch_size * [self.psi_0])
         loss = batch_zeros
+        # We switch to increments
+        data = data[:, 1:] - data[:, :-1]
         data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        psi_0 = self._update_ancilla_psi(psi_0, data[0])
-        data = data[1:]
         _, loss = tf.foldl(self._psi_and_loss_update, data,
                            initializer=(psi_0, loss), name="loss_fold")
-        return tf.reduce_mean(loss)
+        return tf.reduce_sum(loss)
 
     def _psi_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
