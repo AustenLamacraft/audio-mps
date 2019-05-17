@@ -4,10 +4,14 @@ from model import CMPS, RhoCMPS, PsiCMPS
 from data import get_audio
 
 from tensorflow.contrib.training import HParams
-hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=0.001,
-                  sigma=1, h_reg=0, r_reg=0, initial_rank=3, A=1)
+
 
 tf.flags.DEFINE_integer("sample_duration", 2**8, "Duration of samples (as integer).")
+tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
+FLAGS = tf.flags.FLAGS
+
+hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=1, initial_rank=None, A=1,
+                  h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2,)
 
 
 class TestCMPS(tf.test.TestCase):

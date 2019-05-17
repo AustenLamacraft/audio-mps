@@ -133,6 +133,7 @@ class RhoCMPS(CMPS):
         data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
                            initializer=(rho_0, loss), name="loss_fold")
+        print(loss.shape)
         return tf.reduce_sum(loss)
 
     def _rho_update(self, rho_and_loss, signal):
