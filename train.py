@@ -39,8 +39,8 @@ def main(argv):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-        # model = RhoCMPS(hparams=hparams, data_iterator=data)
-        model = PsiCMPS(hparams=hparams, data_iterator=data)
+        model = RhoCMPS(hparams=hparams, data_iterator=data)
+        # model = PsiCMPS(hparams=hparams, data_iterator=data)
 
     with tf.variable_scope("total_loss"):
         total_loss = model.loss + model.h_loss + model.r_loss
