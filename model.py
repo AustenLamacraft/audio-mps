@@ -12,8 +12,11 @@ class CMPS:
         self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
-        self.A = hparams.A
         self.delta_t = hparams.delta_t
+
+        self.A = hparams.A
+        # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
+        # self.A = tf.cast(self.A, dtype=tf.complex64)
 
         self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
         self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
@@ -30,15 +33,18 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
+                                                             initializer=tf.random_normal_initializer)
+            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32,
+                                                             initializer=tf.random_normal_initializer)
 
         if H_in is not None:
 
             self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
 
-            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32,
+                                                                 initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)

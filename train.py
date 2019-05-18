@@ -33,11 +33,9 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 
 def main(argv):
-    # I introduced the hyperparameter A, which is set to 1. by default. The meaning of sigma is not Asgsq{dt} anymore.
-    # sigma now is the strength of the noise.
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2,
-                      initial_rank=None, A=1)
+                      initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -57,6 +55,7 @@ def main(argv):
                                     + hparams.r_reg * r_l2sqnorm
 
     with tf.variable_scope("summaries"):
+        tf.summary.scalar("A", tf.cast(model.A, dtype=tf.float32))
         tf.summary.scalar("sigma", tf.cast(model.sigma, dtype=tf.float32))
         tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
         tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
@@ -64,7 +63,7 @@ def main(argv):
         gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
         tf.summary.scalar("gr_decay_time", 1 / gr_rate)
 
-        tf.summary.scalar("loss_function", tf.reshape(model.loss, []))
+        tf.summary.scalar("model_loss", tf.reshape(model.loss, []))
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
 
@@ -77,7 +76,7 @@ def main(argv):
         tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
 
     step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-    train_op = tf.train.AdamOptimizer(1e-3).minimize(total_loss, global_step=step)
+    train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)
 
     # TODO Unrolling in time?
 
