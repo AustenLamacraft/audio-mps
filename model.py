@@ -48,6 +48,7 @@ class CMPS:
                                                                  initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
+        self.R -= tf.matrix_band_part(self.R, 0, 0) # Remove diagonal elements
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
 
@@ -181,7 +182,7 @@ class RhoCMPS(CMPS):
     def _expectation_RplusRdag_rho(self, rho):
         with tf.variable_scope("expectation"):
             x = tf.add(self.R, tf.linalg.adjoint(self.R))
-            exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
+            exp = tf.einsum('ab,cba->c', x, rho)
             return tf.real(exp)
 
     def _normalize_rho(self, x, epsilon=1e-12):
@@ -286,7 +287,7 @@ class PsiCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            batch_size = rho.shape[0]
+            batch_size = psi.shape[0]
             H = tf.stack(batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
             RR_dag = tf.stack(batch_size * [RR_dag])
