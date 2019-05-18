@@ -12,9 +12,15 @@ class CMPS:
         self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
-        self.sigma = hparams.sigma
-        self.A = hparams.A
         self.delta_t = hparams.delta_t
+
+        self.A = hparams.A
+        # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
+        # self.A = tf.cast(self.A, dtype=tf.complex64)
+
+        self.sigma = hparams.sigma
+        # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
+        # self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
 
         self.data_iterator = data_iterator
 
@@ -28,25 +34,22 @@ class CMPS:
             self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
         else:
 
-            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
-            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32, initializer=None)
+            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
+                                                             initializer=tf.random_normal_initializer)
+            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32,
+                                                             initializer=tf.random_normal_initializer)
 
         if H_in is not None:
 
             self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
         else:
 
-            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32,
+                                                                 initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
-        # ======================================================
-        # Define L2 regularization
-        # ======================================================
-
-        self.h_loss = self.h_reg * tf.reduce_sum(tf.square(self.H_diag))
-        self.r_loss = self.r_reg * tf.real(tf.reduce_sum(tf.conj(self.R) * self.R))
 
 class RhoCMPS(CMPS):
     """
@@ -165,12 +168,12 @@ class RhoCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            # TODO this is wrong, remove batch_size and infer size from signal
-            H = tf.stack(self.batch_size * [self.H])
+            batch_size = rho.shape[0]
+            H = tf.stack(batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag = tf.stack(self.batch_size * [RR_dag])
+            RR_dag = tf.stack(batch_size * [RR_dag])
             IR = tf.einsum('a,bc->abc', signal, self.R)
-            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
