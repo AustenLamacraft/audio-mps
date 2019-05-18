@@ -205,7 +205,7 @@ class PsiCMPS(CMPS):
             self.psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
         self.psi_0 = tf.cast(self.psi_x, dtype=tf.complex64) + 1j * tf.cast(self.psi_y, dtype=tf.complex64)
-        self.psi_0 = self._normalize_psi(self.psi_0)
+        self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
 
         if self.data_iterator is not None:
             self.loss = self._build_loss_psi(self.data_iterator)
@@ -253,14 +253,14 @@ class PsiCMPS(CMPS):
         # TODO change name of first argument
         psi, loss = psi_and_loss
         psi = self._update_ancilla_psi(psi, signal) # signal is the increment
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
         psi = self._update_ancilla_psi(psi, signal)
         loss += self._inc_loss_psi(psi)
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
@@ -268,7 +268,7 @@ class PsiCMPS(CMPS):
         new_sample = last_sample + self._expectation_RplusRdag_psi(psi) * self.A * self.delta_t + noise
         increment = new_sample - last_sample
         psi = self._update_ancilla_psi(psi, increment)  # Note update with increment
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, new_sample
 
     def _inc_loss_psi(self, psi):
