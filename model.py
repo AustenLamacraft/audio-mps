@@ -288,10 +288,10 @@ class PsiCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            # TODO this is wrong, remove batch_size throughout this method and infer size from signal
-            H = tf.stack(self.batch_size * [self.H])
-            R = tf.stack(self.batch_size * [self.R])
-            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            batch_size = psi.shape[0]
+            H = tf.stack(batch_size * [self.H])
+            R = tf.stack(batch_size * [self.R])
+            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             IR = tf.einsum('a,bc->abc', signal, self.R)
             R_dag = tf.linalg.adjoint(R)
             Rpsi = tf.einsum('abc,ac->ab', R, psi)
