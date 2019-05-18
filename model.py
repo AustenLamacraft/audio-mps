@@ -197,7 +197,6 @@ class PsiCMPS(CMPS):
     """
         Evolves the state
     """
-    # TODO everything I have done for rho, I have not touched PsiCMPS class
 
     def __init__(self, hparams, psi_x_in=None, psi_y_in=None, *args, **kwargs):
         super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
