@@ -103,6 +103,7 @@ class RhoCMPS(CMPS):
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
 
     def sample_rho(self, num_samples, length, temp=1):
+        # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
@@ -225,6 +226,7 @@ class PsiCMPS(CMPS):
         return psi
 
     def sample_psi(self, num_samples, length, temp=1):
+        # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.stack(num_samples * [self.psi_0])
         noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
