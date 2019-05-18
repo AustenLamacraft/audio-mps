@@ -297,6 +297,8 @@ class PsiCMPS(CMPS):
             return 2 * tf.real(exp)  # Conveniently returns a float
 
     def _normalize_psi(self, x, axis=None, epsilon=1e-12):
+        #TODO change the method so that it ise clear that the argument axis changes whether we normalize a single psi
+        #TODO or a batch of psis
         with tf.variable_scope("normalize"):
             square_sum = tf.reduce_sum(tf.square(tf.abs(x)), axis, keepdims=True)
             x_inv_norm = tf.rsqrt(tf.maximum(square_sum, epsilon))
