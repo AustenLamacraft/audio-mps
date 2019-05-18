@@ -165,6 +165,7 @@ class RhoCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
+            # TODO this is wrong, remove batch_size and infer size from signal
             H = tf.stack(self.batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
             RR_dag = tf.stack(self.batch_size * [RR_dag])
@@ -284,6 +285,7 @@ class PsiCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
+            # TODO this is wrong, remove batch_size and infer size from signal
             H = tf.stack(self.batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
             RR_dag = tf.stack(self.batch_size * [RR_dag])
