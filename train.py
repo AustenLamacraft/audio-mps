@@ -26,15 +26,16 @@ tf.flags.DEFINE_enum('dataset', 'damped_sine',
 
 tf.flags.DEFINE_integer("sample_duration", 2**16, "Duration of samples (as integer).")
 tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
-tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization. Probably Slow!')
+tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization. Probably slow!')
+tf.flags.DEFINE_integer('num_samples', 3, 'Number of samples to generate.')
 tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
 tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
 tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Directory to write logs.")
 
 
 def main(argv):
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
-                      h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2,
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.00001,
+                      h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate),
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
@@ -66,14 +67,19 @@ def main(argv):
         tf.summary.scalar("model_loss", tf.reshape(model.loss, []))
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
+        tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
+        tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
-            waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
-            tf.summary.image("waveform", waveform_op)
+            data_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
+            tf.summary.image("data_waveform", data_waveform_op)
 
-        tf.summary.audio("samples", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
-        tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
+            if FLAGS.num_samples != 0:
+                samples = model.sample_rho(FLAGS.num_samples, FLAGS.sample_duration)
+                sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
+                tf.summary.image("sample_waveform", sample_waveform_op)
+
 
     step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
     train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)

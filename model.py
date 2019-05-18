@@ -18,8 +18,9 @@ class CMPS:
         # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
         # self.A = tf.cast(self.A, dtype=tf.complex64)
 
-        self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
-        self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
+        self.sigma = hparams.sigma
+        # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
+        # self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
 
         self.data_iterator = data_iterator
 
@@ -166,11 +167,12 @@ class RhoCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            H = tf.stack(self.batch_size * [self.H])
+            batch_size = rho.shape[0]
+            H = tf.stack(batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag = tf.stack(self.batch_size * [RR_dag])
+            RR_dag = tf.stack(batch_size * [RR_dag])
             IR = tf.einsum('a,bc->abc', signal, self.R)
-            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
@@ -284,11 +286,12 @@ class PsiCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            H = tf.stack(self.batch_size * [self.H])
+            batch_size = rho.shape[0]
+            H = tf.stack(batch_size * [self.H])
             RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag = tf.stack(self.batch_size * [RR_dag])
+            RR_dag = tf.stack(batch_size * [RR_dag])
             IR = tf.einsum('a,bc->abc', signal, self.R)
-            one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
+            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
             new_psi = tf.einsum('abc,ac->ab', U, psi)
             return new_psi
