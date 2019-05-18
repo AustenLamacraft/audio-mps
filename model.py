@@ -285,14 +285,17 @@ class PsiCMPS(CMPS):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
-            # TODO this is wrong, remove batch_size and infer size from signal
+            # TODO this is wrong, remove batch_size throughout this method and infer size from signal
             H = tf.stack(self.batch_size * [self.H])
-            RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag = tf.stack(self.batch_size * [RR_dag])
-            IR = tf.einsum('a,bc->abc', signal, self.R)
+            R = tf.stack(self.batch_size * [self.R])
             one = tf.stack(self.batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
-            new_psi = tf.einsum('abc,ac->ab', U, psi)
+            IR = tf.einsum('a,bc->abc', signal, self.R)
+            R_dag = tf.linalg.adjoint(R)
+            Rpsi = tf.einsum('abc,ac->ab', R, psi)
+            RRdagpsi = - 0.5 * self.delta_t * self.sigma**2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
+            U_partial = one + (-1j * H * self.delta_t + IR / self.A)
+            Upartialpsi = tf.einsum('abc,ac->ab', U_partial, psi)
+            new_psi = Upartialpsi + RRdagpsi
             return new_psi
 
     def _expectation_RplusRdag_psi(self, psi):
