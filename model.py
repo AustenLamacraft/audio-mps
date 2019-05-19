@@ -7,7 +7,7 @@ class CMPS:
     Continuous Matrix Product State.
     """
     def __init__(self, hparams, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
-
+        #TODO change name of H_in to something more informative
         self.bond_d = hparams.bond_dim
         self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
@@ -48,8 +48,16 @@ class CMPS:
                                                                  initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
-        self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
+        # The Interaction Picture R is called Rt
+        self.Rt = self._build_Rt()
 
+
+    def _build_Rt(self):
+        R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
+        delta_e = tf.transpose(tf.stack(self.bond_d * [self.H_diag])) - tf.stack(self.bond_d * [self.H_diag])
+        delta_e = tf.cast(delta_e, dtype=tf.complex64)
+        Rt = tf.exp(1j * delta_e * self.delta_t) * R
+        return Rt
 
 class RhoCMPS(CMPS):
     """
@@ -120,6 +128,7 @@ class RhoCMPS(CMPS):
     # Rho methods-PRIVATE
     # =====================
 
+
     def _rho_init(self):
         Wx = tf.cast(self.Wx, dtype=tf.complex64)
         Wy = tf.cast(self.Wy, dtype=tf.complex64)
@@ -169,19 +178,20 @@ class RhoCMPS(CMPS):
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
             batch_size = rho.shape[0]
-            H = tf.stack(batch_size * [self.H])
-            RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
+            RR_dag = tf.matmul(self.Rt, self.Rt, adjoint_a=True)
             RR_dag = tf.stack(batch_size * [RR_dag])
-            IR = tf.einsum('a,bc->abc', signal, self.R)
+            IR = tf.einsum('a,bc->abc', signal, self.Rt)
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
+            U = one - 0.5 * RR_dag * self.delta_t * self.sigma ** 2 + IR / self.A
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho
 
     def _expectation_RplusRdag_rho(self, rho):
         with tf.variable_scope("expectation"):
-            x = tf.add(self.R, tf.linalg.adjoint(self.R))
+            # x = tf.add(self.R, tf.linalg.adjoint(self.R))
+            # TODO sampling in the IP has not been tested yet
+            x = tf.add(self.Rt, tf.linalg.adjoint(self.Rt))
             exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
             return tf.real(exp)
 
@@ -288,21 +298,25 @@ class PsiCMPS(CMPS):
         with tf.variable_scope("update_ancilla"):
             signal = tf.cast(signal, dtype=tf.complex64)
             batch_size = psi.shape[0]
-            H = tf.stack(batch_size * [self.H])
             R = tf.stack(batch_size * [self.R])
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             IR = tf.einsum('a,bc->abc', signal, self.R)
             R_dag = tf.linalg.adjoint(R)
+            expiHdt = tf.stack(batch_size * [tf.exp(1j * tf.cast(self.H_diag, dtype=tf.complex64) * self.delta_t)])
+            psi = tf.conj(expiHdt) * psi
             Rpsi = tf.einsum('abc,ac->ab', R, psi)
-            RRdagpsi = - 0.5 * self.delta_t * self.sigma**2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
-            U_partial = one + (-1j * H * self.delta_t + IR / self.A)
+            RRdagpsi = - 0.5 * self.delta_t * self.sigma ** 2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
+            U_partial = one + IR / self.A
             Upartialpsi = tf.einsum('abc,ac->ab', U_partial, psi)
             new_psi = Upartialpsi + RRdagpsi
+            new_psi = expiHdt * new_psi
             return new_psi
 
     def _expectation_RplusRdag_psi(self, psi):
         with tf.variable_scope("expectation"):
-            exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
+            exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.Rt, psi)
+            # TODO sampling in the IP has not been tested yet
+            # exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
             return 2 * tf.real(exp)  # Conveniently returns a float
 
     def _normalize_psi(self, x, axis=None, epsilon=1e-12):
