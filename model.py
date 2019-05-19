@@ -48,9 +48,8 @@ class CMPS:
                                                                  initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
-        self.R -= tf.matrix_band_part(self.R, 0, 0) # Remove diagonal elements
+        self.R -= tf.matrix_diag_part(self.R) # Remove diagonal part
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
-
 
 class RhoCMPS(CMPS):
     """

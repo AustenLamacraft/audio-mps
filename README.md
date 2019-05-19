@@ -26,7 +26,9 @@ It imports reader.py to make the dataset.
 
 ## Todo
 
+1. ~~What about initialization? Glorot variance depends on size. Change to uniform~~
 1. Sampling
-1. What about initialization? Glorot variance depends on size.
-1. Monitor change of state to see if it is small
+1. Interaction picture 
+1. Prepare spectrograph code to look at effect of upsampling (reducing delta_t)
+1. Monitor change of state upon update to see if it is small.
 1. Exploring latent space
