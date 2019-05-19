@@ -69,6 +69,25 @@ class TestRhoCMPS(tf.test.TestCase):
             updated_rho = model._update_ancilla_rho(stack_rho_0, signal)
             self.assertAllClose(stack_rho_0, updated_rho)
 
+    def testSampling(self):
+        """
+        Samples from a two-level system
+        """
+
+        hparams = HParams(minibatch_size=8, bond_dim=2, delta_t=1 / FLAGS.sample_rate, sigma=1, initial_rank=None, A=1,
+                          h_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, r_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, )
+
+        ω = 10
+        R = np.array([[0, 1], [0, 0]], dtype=np.float32)
+        H = np.array([[ω, 0], [0, -ω]], dtype=np.float32)
+
+        qubit = RhoCMPS(hparams, Rx_in=R, H_in=H)
+
+        waveform = qubit.sample_rho(num_samples=2, length=512)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            self.assertEqual(waveform.eval().shape, (2, 512))
 
 
 if __name__ == '__main__':
