@@ -107,6 +107,7 @@ class RhoCMPS(CMPS):
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
 
     def sample_rho(self, num_samples, length, temp=1):
+        # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
@@ -197,7 +198,6 @@ class PsiCMPS(CMPS):
     """
         Evolves the state
     """
-    # TODO everything I have done for rho, I have not touched PsiCMPS class
 
     def __init__(self, hparams, psi_x_in=None, psi_y_in=None, *args, **kwargs):
         super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
@@ -210,7 +210,7 @@ class PsiCMPS(CMPS):
             self.psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
         self.psi_0 = tf.cast(self.psi_x, dtype=tf.complex64) + 1j * tf.cast(self.psi_y, dtype=tf.complex64)
-        self.psi_0 = self._normalize_psi(self.psi_0)
+        self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
 
         if self.data_iterator is not None:
             self.loss = self._build_loss_psi(self.data_iterator)
@@ -230,6 +230,7 @@ class PsiCMPS(CMPS):
         return psi
 
     def sample_psi(self, num_samples, length, temp=1):
+        # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.stack(num_samples * [self.psi_0])
         noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
@@ -258,14 +259,14 @@ class PsiCMPS(CMPS):
         # TODO change name of first argument
         psi, loss = psi_and_loss
         psi = self._update_ancilla_psi(psi, signal) # signal is the increment
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
     def _psi_and_loss_update(self, psi_and_loss, signal):
         psi, loss = psi_and_loss
         psi = self._update_ancilla_psi(psi, signal)
         loss += self._inc_loss_psi(psi)
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
@@ -273,7 +274,7 @@ class PsiCMPS(CMPS):
         new_sample = last_sample + self._expectation_RplusRdag_psi(psi) * self.A * self.delta_t + noise
         increment = new_sample - last_sample
         psi = self._update_ancilla_psi(psi, increment)  # Note update with increment
-        psi = self._normalize_psi(psi)
+        psi = self._normalize_psi(psi, axis=1)
         return psi, new_sample
 
     def _inc_loss_psi(self, psi):
@@ -289,12 +290,15 @@ class PsiCMPS(CMPS):
             signal = tf.cast(signal, dtype=tf.complex64)
             batch_size = psi.shape[0]
             H = tf.stack(batch_size * [self.H])
-            RR_dag = tf.matmul(self.R, self.R, adjoint_a=True)
-            RR_dag = tf.stack(batch_size * [RR_dag])
-            IR = tf.einsum('a,bc->abc', signal, self.R)
+            R = tf.stack(batch_size * [self.R])
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
-            new_psi = tf.einsum('abc,ac->ab', U, psi)
+            IR = tf.einsum('a,bc->abc', signal, self.R)
+            R_dag = tf.linalg.adjoint(R)
+            Rpsi = tf.einsum('abc,ac->ab', R, psi)
+            RRdagpsi = - 0.5 * self.delta_t * self.sigma**2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
+            U_partial = one + (-1j * H * self.delta_t + IR / self.A)
+            Upartialpsi = tf.einsum('abc,ac->ab', U_partial, psi)
+            new_psi = Upartialpsi + RRdagpsi
             return new_psi
 
     def _expectation_RplusRdag_psi(self, psi):
@@ -303,6 +307,8 @@ class PsiCMPS(CMPS):
             return 2 * tf.real(exp)  # Conveniently returns a float
 
     def _normalize_psi(self, x, axis=None, epsilon=1e-12):
+        #TODO change the method so that it ise clear that the argument axis changes whether we normalize a single psi
+        #TODO or a batch of psis
         with tf.variable_scope("normalize"):
             square_sum = tf.reduce_sum(tf.square(tf.abs(x)), axis, keepdims=True)
             x_inv_norm = tf.rsqrt(tf.maximum(square_sum, epsilon))
