@@ -5,8 +5,7 @@ import tfplot
 def symmetrize(M):
     with tf.variable_scope("symmetrize"):
         M_lower = tf.matrix_band_part(M, -1, 0)
-        M_diag = tf.matrix_band_part(M, 0, 0)
-        return M_lower + tf.matrix_transpose(M_lower) - M_diag
+        return M_lower + tf.matrix_transpose(M_lower) - tf.diag_part(M)
 
 def waveform_plot(waveform, delta_t):
     fig, ax = tfplot.subplots(figsize=(3, 3))

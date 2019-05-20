@@ -79,7 +79,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
         ω = 10
         R = np.array([[0, 1], [0, 0]], dtype=np.float32)
-        H = np.array([[ω, 0], [0, -ω]], dtype=np.float32)
+        H = np.array([ω, -ω], dtype=np.float32)
 
         qubit = RhoCMPS(hparams, Rx_in=R, H_in=H)
 
