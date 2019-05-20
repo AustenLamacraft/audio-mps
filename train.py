@@ -58,17 +58,17 @@ def main(argv):
     with tf.variable_scope("summaries"):
         tf.summary.scalar("A", tf.cast(model.A, dtype=tf.float32))
         tf.summary.scalar("sigma", tf.cast(model.sigma, dtype=tf.float32))
-        tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
-        tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
-
-        gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
-        tf.summary.scalar("gr_decay_time", 1 / gr_rate)
-
-        tf.summary.scalar("model_loss", tf.reshape(model.loss, []))
-        tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
-
-        tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
-        tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
+        # tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
+        # tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
+        #
+        # gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
+        # tf.summary.scalar("gr_decay_time", 1 / gr_rate)
+        #
+        # tf.summary.scalar("model_loss", tf.reshape(model.loss, []))
+        # tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
+        #
+        # tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
+        # tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
