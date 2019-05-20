@@ -16,7 +16,6 @@ class CMPS:
 
         self.A = hparams.A
         # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
-        # self.A = tf.cast(self.A, dtype=tf.complex64)
 
         self.sigma = hparams.sigma
         # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
@@ -174,7 +173,8 @@ class RhoCMPS(CMPS):
             RR_dag = tf.stack(batch_size * [RR_dag])
             IR = tf.einsum('a,bc->abc', signal, self.R)
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
+            U = one + (-1j * H * self.delta_t - 0.5 * RR_dag * self.delta_t * self.sigma**2
+                       + IR / tf.cast(self.A, dtype=tf.complex64))
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
             return new_rho
