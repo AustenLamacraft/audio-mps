@@ -29,14 +29,16 @@ class CMPS:
         #======================================================
 
         if R_in is not None:
-            self.Rx = tf.get_variable("Rx", dtype=tf.float32, initializer=R_in.real)
-            self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=R_in.imag)
+            Rx = tf.get_variable("Rx", dtype=tf.float32, initializer=R_in.real)
+            Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=R_in.imag)
         else:
 
-            self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
+            Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
                                                              initializer=tf.random_normal_initializer)
-            self.Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32,
+            Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32,
                                                              initializer=tf.random_normal_initializer)
+
+        self.R = tf.complex(Rx, Ry)
 
         if H_in is not None:
 
@@ -46,7 +48,6 @@ class CMPS:
             self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32,
                                                                  initializer=tf.random_normal_initializer)
 
-        self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
         self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
 
 
@@ -196,17 +197,17 @@ class PsiCMPS(CMPS):
         Evolves the state
     """
 
-    def __init__(self, hparams, psi_x_in=None, psi_y_in=None, *args, **kwargs):
+    def __init__(self, hparams, psi_in=None, *args, **kwargs):
         super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
 
-        if psi_x_in is not None and psi_y_in is not None:
-            self.psi_x = tf.get_variable("psi_x", dtype=tf.float32, initializer=psi_x_in)
-            self.psi_y = tf.get_variable("psi_y", dtype=tf.float32, initializer=psi_y_in)
+        if psi_in is not None:
+            psi_x = tf.get_variable("psi_x", dtype=tf.float32, initializer=psi_x_in)
+            psi_y = tf.get_variable("psi_y", dtype=tf.float32, initializer=psi_y_in)
         else:
-            self.psi_x = tf.get_variable("psi_x", shape=[self.bond_d], dtype=tf.float32, initializer=None)
-            self.psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            psi_x = tf.get_variable("psi_x", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
 
-        self.psi_0 = tf.cast(self.psi_x, dtype=tf.complex64) + 1j * tf.cast(self.psi_y, dtype=tf.complex64)
+        self.psi_0 = tf.complex(psi_x, psi_y)
         self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
 
         if self.data_iterator is not None:
