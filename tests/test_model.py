@@ -59,9 +59,9 @@ class TestRhoCMPS(tf.test.TestCase):
         """
 
         test_H_diag = np.zeros([hparams.bond_dim], dtype=np.float32)
-        test_R = np.zeros(2*[hparams.bond_dim], dtype=np.float32)
+        test_R = np.zeros(2*[hparams.bond_dim], dtype=np.complex64)
         signal = np.random.rand(hparams.minibatch_size).astype(dtype=np.float32)
-        model = RhoCMPS(hparams, H_in=test_H_diag, Rx_in=test_R, Ry_in=test_R)
+        model = RhoCMPS(hparams, H_in=test_H_diag, R_in=test_R)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -78,10 +78,10 @@ class TestRhoCMPS(tf.test.TestCase):
                           h_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, r_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, )
 
         ω = 10
-        R = np.array([[0, 1], [0, 0]], dtype=np.float32)
+        R = np.array([[0, 1], [0, 0]], dtype=np.complex64)
         H = np.array([ω, -ω], dtype=np.float32)
 
-        qubit = RhoCMPS(hparams, Rx_in=R, H_in=H)
+        qubit = RhoCMPS(hparams, R_in=R, H_in=H)
 
         waveform = qubit.sample_rho(num_samples=2, length=512)
 

@@ -6,7 +6,7 @@ class CMPS:
     """
     Continuous Matrix Product State.
     """
-    def __init__(self, hparams, data_iterator=None, H_in=None, Rx_in=None, Ry_in=None):
+    def __init__(self, hparams, data_iterator=None, H_in=None, R_in=None):
 
         self.bond_d = hparams.bond_dim
         self.batch_size = hparams.minibatch_size
@@ -28,10 +28,9 @@ class CMPS:
         # Training variables (cannot be complex)
         #======================================================
 
-        if Rx_in is not None and Ry_in is not None:
-
-            self.Rx = tf.get_variable("Rx", dtype=tf.float32, initializer=Rx_in)
-            self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=Ry_in)
+        if R_in is not None:
+            self.Rx = tf.get_variable("Rx", dtype=tf.float32, initializer=R_in.real)
+            self.Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=R_in.imag)
         else:
 
             self.Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
@@ -55,7 +54,7 @@ class RhoCMPS(CMPS):
     """
         Evolves the density matrix
     """
-    def __init__(self, hparams, Wx_in=None, Wy_in=None, *args, **kwargs):
+    def __init__(self, hparams, W_in=None, *args, **kwargs):
         super(RhoCMPS, self).__init__(hparams, *args, **kwargs)
 
         if hparams.initial_rank is not None:
@@ -63,14 +62,7 @@ class RhoCMPS(CMPS):
         else:
             self.rank_rho_0 = hparams.bond_dim
 
-        if Wx_in is not None and Wy_in is not None:
-            self.Wx = tf.get_variable("Wx", dtype=tf.float32, initializer=Wx_in)
-            self.Wy = tf.get_variable("Wy", dtype=tf.float32, initializer=Wy_in)
-        else:
-            self.Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
-            self.Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
-
-        self.rho_0 = self._rho_init()
+        self.rho_0 = self._rho_init(W_in)
 
         if self.data_iterator is not None:
             self.loss = self._build_loss_rho(self.data_iterator)
@@ -120,10 +112,16 @@ class RhoCMPS(CMPS):
     # Rho methods-PRIVATE
     # =====================
 
-    def _rho_init(self):
-        Wx = tf.cast(self.Wx, dtype=tf.complex64)
-        Wy = tf.cast(self.Wy, dtype=tf.complex64)
-        W = Wx + 1j * Wy
+    def _rho_init(self, W_in):
+        if W_in is not None:
+            Wx_in = W_in.real
+            Wy_in = W_in.imag
+            Wx = tf.get_variable("Wx", dtype=tf.float32, initializer=Wx_in)
+            Wy = tf.get_variable("Wy", dtype=tf.float32, initializer=Wy_in)
+        else:
+            Wx = tf.get_variable("Wx", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
+            Wy = tf.get_variable("Wy", shape=[self.rank_rho_0, self.bond_d], dtype=tf.float32, initializer=None)
+        W = tf.complex(Wx, Wy)
         rho_0 = tf.matmul(W, W, adjoint_a=True)
         rho_0 = rho_0 / tf.trace(rho_0)
         return rho_0
