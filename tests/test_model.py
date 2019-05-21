@@ -87,10 +87,8 @@ class TestRhoCMPS(tf.test.TestCase):
         test_R = tf.constant([[1., 2.], [3., 4.]], dtype=tf.float32)
         test_psi_x = tf.constant([.7, 0.5], dtype=tf.float32)
         test_psi_y = tf.constant([4.1, 9.3], dtype=tf.float32)
-        test_psi = tf.cast(test_psi_x, dtype=tf.complex64) + 1j*tf.cast(test_psi_y, dtype=tf.complex64)
         test_Wx = tf.reshape(test_psi_x, [1, 2])
         test_Wy = -tf.reshape(test_psi_y, [1, 2])
-        test_W = tf.cast(test_Wx, dtype=tf.complex64) + 1j*tf.cast(test_Wy, dtype=tf.complex64)
         length = 10
         range_stack = tf.stack(hparams.minibatch_size * [tf.range(length, dtype=np.float32)])
         data = tf.cos((range_stack))
@@ -109,17 +107,6 @@ class TestRhoCMPS(tf.test.TestCase):
                             psi_x_in=test_psi_x,
                             psi_y_in=test_psi_y)
 
-        # model_rho = RhoCMPS(hparams, data_iterator=data,
-        #                     H_in=test_H_diag,
-        #                     Rx_in=test_R,
-        #                     Ry_in=test_R,
-        #                     W_in=test_W)
-
-        # model_psi = PsiCMPS(hparams, data_iterator=data,
-        #                     H_in=test_H_diag,
-        #                     Rx_in=test_R,
-        #                     Ry_in=test_R,
-        #                     psi_in=test_psi)
 
 
 
@@ -148,10 +135,8 @@ class TestRhoCMPS(tf.test.TestCase):
         test_R = tf.constant([[1., 2.], [3., 4.]], dtype=tf.float32)
         test_psi_x = tf.constant([.7, 0.5], dtype=tf.float32)
         test_psi_y = tf.constant([4.1, 9.3], dtype=tf.float32)
-        test_psi = tf.cast(test_psi_x, dtype=tf.complex64) + 1j * tf.cast(test_psi_y, dtype=tf.complex64)
         test_Wx = tf.reshape(test_psi_x, [1, 2])
         test_Wy = -tf.reshape(test_psi_y, [1, 2])
-        test_W = tf.cast(test_Wx, dtype=tf.complex64) + 1j * tf.cast(test_Wy, dtype=tf.complex64)
 
         model_rho = RhoCMPS(hparams,
                             H_in=test_H_diag,
