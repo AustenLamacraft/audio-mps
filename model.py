@@ -6,7 +6,7 @@ class CMPS:
     """
     Continuous Matrix Product State.
     """
-    def __init__(self, hparams, data_iterator=None, H_in=None, R_in=None):
+    def __init__(self, hparams, data_iterator=None, freqs_in=None, R_in=None):
 
         self.bond_d = hparams.bond_dim
         self.batch_size = hparams.minibatch_size
@@ -41,16 +41,15 @@ class CMPS:
 
         self.R = tf.complex(Rx, Ry)
 
-        if H_in is not None:
+        if freqs_in is not None:
 
-            self.H_diag = tf.get_variable("H_diag", dtype=tf.float32, initializer=H_in)
+            self.freqs = tf.get_variable("freqs", dtype=tf.float32, initializer=freqs_in)
         else:
 
-            self.H_diag = tf.rsqrt(self.h_reg) * tf.get_variable("h_diag", shape=[self.bond_d], dtype=tf.float32,
-                                                                 initializer=tf.random_normal_initializer)
+            self.freqs = tf.rsqrt(self.h_reg) * tf.get_variable("freqs", shape=[self.bond_d], dtype=tf.float32,
+                                                                initializer=tf.random_normal_initializer)
 
-        self.H_diag = tf.cast(self.H_diag, dtype=tf.complex64)
-        self.H = tf.cast(tf.diag(self.H_diag), dtype=tf.complex64)
+        self.freqsc = tf.cast(self.freqs, dtype=tf.complex64)
 
 
 class RhoCMPS(CMPS):
@@ -174,7 +173,7 @@ class RhoCMPS(CMPS):
             signal = tf.cast(signal, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             batch_size = rho.shape[0]
-            phases = tf.exp(1j * self.H_diag * t)
+            phases = tf.exp(1j * self.freqsc * t)
             Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
             RR_dag = tf.matmul(Rt, Rt, adjoint_a=True)
             RR_dag = tf.stack(batch_size * [RR_dag])
@@ -188,7 +187,7 @@ class RhoCMPS(CMPS):
     def _expectation_RplusRdag_rho(self, rho, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
-            phases = tf.exp(1j * self.H_diag * t)
+            phases = tf.exp(1j * self.freqsc * t)
             Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
             x = tf.add(Rt, tf.linalg.adjoint(Rt))
             exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))

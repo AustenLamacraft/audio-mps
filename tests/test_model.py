@@ -14,17 +14,6 @@ hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sig
                   h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2,)
 
 
-class TestCMPS(tf.test.TestCase):
-
-    def testHIsHermitian(self):
-
-        model = CMPS(hparams)
-
-        with self.cached_session() as sess:
-            sess.run(tf.global_variables_initializer())
-            self.assertAllClose(model.H, tf.linalg.adjoint(model.H))
-
-
 class TestRhoCMPS(tf.test.TestCase):
 
     def testLossNotNaN(self):
@@ -44,15 +33,6 @@ class TestRhoCMPS(tf.test.TestCase):
             self.assertAllClose(model.rho_0, model.rho_0 / tf.trace(model.rho_0))
             self.assertAllClose(model.rho_0, tf.transpose(model.rho_0, conjugate=True))
 
-    def testHInitialization(self):
-
-        test_H_diag = np.random.rand(hparams.bond_dim).astype(dtype=np.float32)
-        model = RhoCMPS(hparams, H_in=test_H_diag)
-
-        with self.cached_session() as sess:
-            sess.run(tf.global_variables_initializer())
-            self.assertAllClose(model.H, np.diag(test_H_diag))
-
     def testTrivialUpdateOfAncilla(self):
         """
         Update with H=R=0
@@ -61,7 +41,7 @@ class TestRhoCMPS(tf.test.TestCase):
         test_H_diag = np.zeros([hparams.bond_dim], dtype=np.float32)
         test_R = np.zeros(2*[hparams.bond_dim], dtype=np.complex64)
         signal = np.random.rand(hparams.minibatch_size).astype(dtype=np.float32)
-        model = RhoCMPS(hparams, H_in=test_H_diag, R_in=test_R)
+        model = RhoCMPS(hparams, freqs_in=test_H_diag, R_in=test_R)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -79,9 +59,9 @@ class TestRhoCMPS(tf.test.TestCase):
 
         ω = 10
         R = np.array([[0, 1], [0, 0]], dtype=np.complex64)
-        H = np.array([ω, -ω], dtype=np.float32)
+        freqs = np.array([ω, -ω], dtype=np.float32)
 
-        qubit = RhoCMPS(hparams, R_in=R, H_in=H)
+        qubit = RhoCMPS(hparams, R_in=R, freqs_in=freqs)
 
         waveform = qubit.sample_rho(num_samples=2, length=512)
 
