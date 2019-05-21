@@ -48,16 +48,17 @@ class CMPS:
                                                                  initializer=tf.random_normal_initializer)
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
-        # The Interaction Picture R is called Rt
-        self.Rt = self._build_Rt()
 
-
-    def _build_Rt(self):
-        R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
-        delta_e = tf.transpose(tf.stack(self.bond_d * [self.H_diag])) - tf.stack(self.bond_d * [self.H_diag])
-        delta_e = tf.cast(delta_e, dtype=tf.complex64)
-        Rt = tf.exp(1j * delta_e * self.delta_t) * R
-        return Rt
+        #TODO remove all this Rt murky business
+    #     self.Rt = self._build_Rt()
+    #
+    #
+    # def _build_Rt(self):
+    #     R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
+    #     delta_e = tf.transpose(tf.stack(self.bond_d * [self.H_diag])) - tf.stack(self.bond_d * [self.H_diag])
+    #     delta_e = tf.cast(delta_e, dtype=tf.complex64)
+    #     Rt = tf.exp(1j * delta_e * self.delta_t) * R
+    #     return Rt
 
 class RhoCMPS(CMPS):
     """
@@ -143,26 +144,33 @@ class RhoCMPS(CMPS):
         loss = batch_zeros
         # We switch to increments
         data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
-        _, loss = tf.foldl(self._rho_and_loss_update, data,
+        # We now introduce a time vector and combine it with the data
+        length = tf.shape(data)[1]
+        time = tf.cast([tf.range(length) + 1], dtype=tf.float32) * self.delta_t
+        # Time will appear at the end of each batch vector, at each time step.
+        # So we extract it by splitting up each batch vector inside _update_ancilla_rho
+        data_and_time = tf.concat([data, time], axis=0)
+        data_and_time = tf.transpose(data_and_time, [1, 0])  # foldl goes along the 1st dimension
+        _, loss = tf.foldl(self._rho_and_loss_update, data_and_time,
                            initializer=(rho_0, loss), name="loss_fold")
         return tf.reduce_mean(loss)
 
-    def _rho_update(self, rho_and_loss, signal):
+    def _rho_update(self, rho_and_loss, signal_and_time):
         # TODO change the name of the first argument
         rho, loss = rho_and_loss
-        rho = self._update_ancilla_rho(rho, signal) # signal is the increment
+        rho = self._update_ancilla_rho(rho, signal_and_time) # signal is the increment
         rho = self._normalize_rho(rho)
         return rho, loss
 
-    def _rho_and_loss_update(self, rho_and_loss, signal):
+    def _rho_and_loss_update(self, rho_and_loss, signal_and_time):
         rho, loss = rho_and_loss
-        rho = self._update_ancilla_rho(rho, signal)
+        rho = self._update_ancilla_rho(rho, signal_and_time)
         loss += self._inc_loss_rho(rho)
         rho = self._normalize_rho(rho)
         return rho, loss
 
     def _rho_and_sample_update(self, rho_and_sample, noise):
+        #TODO introduce _and_time notation
         rho, last_sample = rho_and_sample
         new_sample = last_sample + self._expectation_RplusRdag_rho(rho) * self.A * self.delta_t + noise
         increment = new_sample - last_sample
@@ -173,14 +181,23 @@ class RhoCMPS(CMPS):
     def _inc_loss_rho(self, rho):
         return - tf.log(tf.real(tf.trace(rho)))
 
-    def _update_ancilla_rho(self, rho, signal):
+    def _update_ancilla_rho(self, rho, signal_and_time):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
+            # split signal and time
+            signal = signal_and_time[:-1] # The last element is time
+            time = signal_and_time[-1]
+            # Construct R(t) = exp[iHt] R exp[-iHt], where H is diagonal. Then, R_ab(t)=R_ab exp[i(wa-wb)t].
+            # We define the matrix delta_w with elements (delta_w)_ab = wa-wb.
+            delta_w = tf.transpose(tf.stack(self.bond_d * [self.H_diag])) - tf.stack(self.bond_d * [self.H_diag])
+            delta_w, time = tf.cast(delta_w, dtype=tf.complex64), tf.cast(time, dtype=tf.complex64)
+            Rt = tf.exp(1j * delta_w * time) * self.R # This is elementwise multiplication, as it should be.
+            #####
             signal = tf.cast(signal, dtype=tf.complex64)
             batch_size = rho.shape[0]
-            RR_dag = tf.matmul(self.Rt, self.Rt, adjoint_a=True)
+            RR_dag = tf.matmul(Rt, Rt, adjoint_a=True)
             RR_dag = tf.stack(batch_size * [RR_dag])
-            IR = tf.einsum('a,bc->abc', signal, self.Rt)
+            IR = tf.einsum('a,bc->abc', signal, Rt)
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             U = one - 0.5 * RR_dag * self.delta_t * self.sigma ** 2 + IR / self.A
             U_dag = tf.linalg.adjoint(U)
@@ -191,6 +208,7 @@ class RhoCMPS(CMPS):
         with tf.variable_scope("expectation"):
             # x = tf.add(self.R, tf.linalg.adjoint(self.R))
             # TODO sampling in the IP has not been tested yet
+            # TODO update Rt business
             x = tf.add(self.Rt, tf.linalg.adjoint(self.Rt))
             exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
             return tf.real(exp)
@@ -259,26 +277,34 @@ class PsiCMPS(CMPS):
         loss = batch_zeros
         # We switch to increments
         data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        _, loss = tf.foldl(self._psi_and_loss_update, data,
+        # We now introduce a time vector and combine it with the data
+        length = tf.shape(data)[1]
+        time = tf.cast([tf.range(length) + 1], dtype=tf.float32) * self.delta_t
+        # Time will appear at the end of each batch vector, at each time step.
+        # So we extract it by splitting up each batch vector inside _update_ancilla_rho
+        data_and_time = tf.concat([data, time], axis=0)
+        data_and_time = tf.transpose(data_and_time, [1, 0])  # foldl goes along the 1st dimension
+        _, loss = tf.foldl(self._psi_and_loss_update, data_and_time,
                            initializer=(psi_0, loss), name="loss_fold")
         return tf.reduce_mean(loss)
 
-    def _psi_update(self, psi_and_loss, signal):
+
+    def _psi_update(self, psi_and_loss, signal_and_time):
         # TODO change name of first argument
         psi, loss = psi_and_loss
-        psi = self._update_ancilla_psi(psi, signal) # signal is the increment
+        psi = self._update_ancilla_psi(psi, signal_and_time) # signal is the increment
         psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
-    def _psi_and_loss_update(self, psi_and_loss, signal):
+    def _psi_and_loss_update(self, psi_and_loss, signal_and_time):
         psi, loss = psi_and_loss
-        psi = self._update_ancilla_psi(psi, signal)
+        psi = self._update_ancilla_psi(psi, signal_and_time)
         loss += self._inc_loss_psi(psi)
         psi = self._normalize_psi(psi, axis=1)
         return psi, loss
 
     def _psi_and_sample_update(self, psi_and_sample, noise):
+        # TODO introduce _and_time notation and figure shit out
         psi, last_sample = psi_and_sample
         new_sample = last_sample + self._expectation_RplusRdag_psi(psi) * self.A * self.delta_t + noise
         increment = new_sample - last_sample
@@ -293,27 +319,34 @@ class PsiCMPS(CMPS):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
         return tf.real(exp)
 
-    def _update_ancilla_psi(self, psi, signal):
+    def _update_ancilla_psi(self, psi, signal_and_time):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal, dtype=tf.complex64)
+            # split signal and time
+            signal = signal_and_time[:-1]  # The last element is time
+            time = signal_and_time[-1]
+            # this all the same
+            signal, time = tf.cast(signal, dtype=tf.complex64), tf.cast(time, dtype=tf.complex64)
             batch_size = psi.shape[0]
             R = tf.stack(batch_size * [self.R])
             one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
             IR = tf.einsum('a,bc->abc', signal, self.R)
             R_dag = tf.linalg.adjoint(R)
-            expiHdt = tf.stack(batch_size * [tf.exp(1j * tf.cast(self.H_diag, dtype=tf.complex64) * self.delta_t)])
-            psi = tf.conj(expiHdt) * psi
+            # Construct exp[iHt], where H is diagonal.
+            expiHt = tf.stack(batch_size * [tf.exp(1j * tf.cast(self.H_diag, dtype=tf.complex64) * time)])
+            #
+            psi = tf.conj(expiHt) * psi
             Rpsi = tf.einsum('abc,ac->ab', R, psi)
             RRdagpsi = - 0.5 * self.delta_t * self.sigma ** 2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
             U_partial = one + IR / self.A
             Upartialpsi = tf.einsum('abc,ac->ab', U_partial, psi)
             new_psi = Upartialpsi + RRdagpsi
-            new_psi = expiHdt * new_psi
+            new_psi = expiHt * new_psi
             return new_psi
 
     def _expectation_RplusRdag_psi(self, psi):
         with tf.variable_scope("expectation"):
+            #TODO update Rt business
             exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.Rt, psi)
             # TODO sampling in the IP has not been tested yet
             # exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
