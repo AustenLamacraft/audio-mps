@@ -16,8 +16,7 @@ class CMPS:
         self.dt = tf.constant(hparams.delta_t, tf.float32) # Needed for increments
 
         self.A = hparams.A
-        # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
-        # self.A = tf.cast(self.A, dtype=tf.complex64)
+        self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
 
         self.sigma = hparams.sigma
         # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
@@ -40,6 +39,7 @@ class CMPS:
                                                              initializer=tf.random_normal_initializer)
 
         self.R = tf.complex(Rx, Ry)
+        self.R -= tf.matrix_diag_part(self.R) # Remove diagonal part
 
         if freqs_in is not None:
 
@@ -86,7 +86,7 @@ class RhoCMPS(CMPS):
     def rho_evolve_with_sampling(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples, _ = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros, 0.), name="rho_scan")
         return rho
@@ -94,7 +94,7 @@ class RhoCMPS(CMPS):
     def purity(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples, _ = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros, 0.), name="purity_scan")
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
@@ -103,12 +103,12 @@ class RhoCMPS(CMPS):
         # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
-        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
+        noise = tf.random_normal([length, num_samples], stddev=self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples, _ = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros, 0.), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
-        return tf.transpose(samples, [1, 0])
+        return self.A * tf.transpose(samples, [1, 0])
 
     # =====================
     # Rho methods-PRIVATE
@@ -156,13 +156,13 @@ class RhoCMPS(CMPS):
         return rho, loss, t
 
     def _rho_and_sample_update(self, rho_sample_t, noise):
-        rho, last_sample, t = rho_sample_t
-        new_sample = last_sample + self._expectation_RplusRdag_rho(rho, t) * self.A * self.delta_t + noise
-        increment = new_sample - last_sample
+        rho, sample, t = rho_sample_t
+        increment = self._expectation_RplusRdag_rho(rho, t) * self.delta_t + noise
+        sample += increment
         rho = self._update_ancilla_rho(rho, increment, t) # Note update with increment
         rho = self._normalize_rho(rho)
         t += self.dt
-        return rho, new_sample, t
+        return rho, sample, t
 
     def _inc_loss_rho(self, rho):
         return - tf.log(tf.real(tf.trace(rho)))
@@ -170,19 +170,20 @@ class RhoCMPS(CMPS):
     def _update_ancilla_rho(self, rho, signal, t):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal, dtype=tf.complex64)
+            signal = tf.cast(signal / self.A, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             batch_size = rho.shape[0]
             phases = tf.exp(1j * self.freqsc * t)
             Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
             RR_dag = tf.matmul(Rt, Rt, adjoint_a=True)
-            RR_dag = tf.stack(batch_size * [RR_dag])
+            RR_dag = tf.expand_dims(RR_dag, axis=0)
             IR = tf.einsum('a,bc->abc', signal, Rt)
-            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            U = one + (- 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR / self.A)
+            one = tf.eye(self.bond_d, batch_shape=[batch_size], dtype=tf.complex64)
+            U = one + (- 0.5 * RR_dag * self.delta_t * self.sigma**2 + IR)
             U_dag = tf.linalg.adjoint(U)
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
-            return new_rho
+        return new_rho
+
 
     def _expectation_RplusRdag_rho(self, rho, t):
         with tf.variable_scope("expectation"):
