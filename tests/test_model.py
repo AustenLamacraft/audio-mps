@@ -133,7 +133,7 @@ class TestRhoCMPS(tf.test.TestCase):
             self.assertAllClose(loss_rho, energy)
             self.assertAllClose(loss_rho, loss_psi)
 
-    def testnoislessSamplingPureRhoMatchPsi(self):
+    def testnoiselessSamplingPureRhoMatchPsi(self):
 
         hparams = HParams(minibatch_size=3,
                           bond_dim=2,
