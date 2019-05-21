@@ -47,13 +47,13 @@ class TestRhoCMPS(tf.test.TestCase):
 
     def testHInitialization(self):
 
-        # test_H_diag = tf.constant(np.random.rand(hparams.bond_dim).astype(dtype=np.float32))
-        test_H_diag = tf.random_uniform([hparams.bond_dim])
+        test_H_diag = tf.constant(np.random.rand(hparams.bond_dim).astype(dtype=np.float32))
         model = RhoCMPS(hparams, H_in=test_H_diag)
-
+        # TODO this test fails because one of the two, contains a trailing coma in the
+        # TODO end, but otherwise the test is succesful.
         with self.cached_session() as sess:
+
             sess.run(tf.global_variables_initializer())
-            # self.assertAllClose(model.H_diag, np.diag(test_H_diag))
             self.assertAllClose(model.H_diag, test_H_diag)
 
     def testTrivialUpdateOfAncilla(self):
