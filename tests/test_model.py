@@ -66,7 +66,7 @@ class TestRhoCMPS(tf.test.TestCase):
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             stack_rho_0 = tf.stack(hparams.minibatch_size * [model.rho_0])
-            updated_rho = model._update_ancilla_rho(stack_rho_0, signal)
+            updated_rho = model._update_ancilla_rho(stack_rho_0, signal, 0.)
             self.assertAllClose(stack_rho_0, updated_rho)
 
     def testSampling(self):
