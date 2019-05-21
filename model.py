@@ -49,16 +49,6 @@ class CMPS:
 
         self.R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
 
-        #TODO remove all this Rt murky business
-    #     self.Rt = self._build_Rt()
-    #
-    #
-    # def _build_Rt(self):
-    #     R = tf.cast(self.Rx, dtype=tf.complex64) + 1j * tf.cast(self.Ry, dtype=tf.complex64)
-    #     delta_e = tf.transpose(tf.stack(self.bond_d * [self.H_diag])) - tf.stack(self.bond_d * [self.H_diag])
-    #     delta_e = tf.cast(delta_e, dtype=tf.complex64)
-    #     Rt = tf.exp(1j * delta_e * self.delta_t) * R
-    #     return Rt
 
 class RhoCMPS(CMPS):
     """
