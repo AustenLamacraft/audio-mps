@@ -12,7 +12,7 @@ class CMPS:
         self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
-        self.delta_t = hparams.delta_t
+        self.delta_t = tf.constant(hparams.delta_t, tf.float32)
 
         self.A = hparams.A
         # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
@@ -105,7 +105,7 @@ class RhoCMPS(CMPS):
         rho_0 = tf.stack(num_samples * [self.rho_0])
         noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples = tf.scan(self._rho_and_sample_update, noise,
-                               initializer=(rho_0, batch_zeros, 0.), name="sample_scan")
+                               initializer=(rho_0, batch_zeros, np.array(0)), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
         return tf.transpose(samples, [1, 0])
@@ -136,7 +136,7 @@ class RhoCMPS(CMPS):
         data = data[:, 1:] - data[:, :-1]
         data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
         _, loss = tf.foldl(self._rho_and_loss_update, data,
-                           initializer=(rho_0, loss, 0.), name="loss_fold")
+                           initializer=(rho_0, loss, np.array(0)), name="loss_fold")
         return tf.reduce_mean(loss)
 
     def _rho_update(self, rho_loss_t, signal):
@@ -145,7 +145,7 @@ class RhoCMPS(CMPS):
         rho = self._update_ancilla_rho(rho, signal, t) # signal is the increment
         rho = self._normalize_rho(rho)
         t += self.delta_t
-        return rho, loss
+        return rho, loss, t
 
     def _rho_and_loss_update(self, rho_loss_t, signal):
         rho, loss, t = rho_loss_t
@@ -153,7 +153,7 @@ class RhoCMPS(CMPS):
         loss += self._inc_loss_rho(rho)
         rho = self._normalize_rho(rho)
         t += self.delta_t
-        return rho, loss
+        return rho, loss, t
 
     def _rho_and_sample_update(self, rho_sample_t, noise):
         rho, last_sample, t = rho_sample_t
@@ -162,7 +162,7 @@ class RhoCMPS(CMPS):
         rho = self._update_ancilla_rho(rho, increment, t) # Note update with increment
         rho = self._normalize_rho(rho)
         t += self.delta_t
-        return rho, new_sample
+        return rho, new_sample, t
 
     def _inc_loss_rho(self, rho):
         return - tf.log(tf.real(tf.trace(rho)))
@@ -186,6 +186,7 @@ class RhoCMPS(CMPS):
 
     def _expectation_RplusRdag_rho(self, rho, t):
         with tf.variable_scope("expectation"):
+            t = tf.cast(t, dtype=tf.complex64)
             phases = tf.exp(1j * self.H_diag * t)
             Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
             x = tf.add(Rt, tf.linalg.adjoint(Rt))
