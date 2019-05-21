@@ -22,7 +22,6 @@ class TestCMPS(tf.test.TestCase):
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            # self.assertAllClose(model.H_diag, tf.linalg.adjoint(model.H_diag))
             self.assertAllClose(model.H_diag, tf.conj(model.H_diag))
 
 
