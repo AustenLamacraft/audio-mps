@@ -33,9 +33,9 @@ class CMPS:
             Ry = tf.get_variable("Ry", dtype=tf.float32, initializer=R_in.imag)
         else:
 
-            Rx = tf.rsqrt(self.r_reg) * tf.get_variable("rx", shape=2*[self.bond_d], dtype=tf.float32,
+            Rx = tf.rsqrt(self.r_reg) * tf.get_variable("Rx", shape=2*[self.bond_d], dtype=tf.float32,
                                                              initializer=tf.random_normal_initializer)
-            Ry = tf.rsqrt(self.r_reg) * tf.get_variable("ry", shape=2*[self.bond_d], dtype=tf.float32,
+            Ry = tf.rsqrt(self.r_reg) * tf.get_variable("Ry", shape=2*[self.bond_d], dtype=tf.float32,
                                                              initializer=tf.random_normal_initializer)
 
         self.R = tf.complex(Rx, Ry)
