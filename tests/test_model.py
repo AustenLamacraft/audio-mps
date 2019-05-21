@@ -44,6 +44,17 @@ class TestRhoCMPS(tf.test.TestCase):
             self.assertAllClose(model.rho_0, model.rho_0 / tf.trace(model.rho_0))
             self.assertAllClose(model.rho_0, tf.transpose(model.rho_0, conjugate=True))
 
+    def testRhoRemainsNormalized(self):
+        data = get_audio(None, 'damped_sine', hparams)
+        model = RhoCMPS(hparams, data_iterator=data)
+        rho_out = model.rho_evolve_with_data()
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            self.assertAllClose(tf.trace(rho_out), tf.ones_like(rho_out[:,:,0,0]), rtol=1e-5)
+            print(rho_out.shape)
+
+
     def testTrivialUpdateOfAncilla(self):
         """
         Update with H=R=0

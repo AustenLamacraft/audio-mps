@@ -16,7 +16,7 @@ class CMPS:
         self.dt = tf.constant(hparams.delta_t, tf.float32) # Needed for increments
 
         self.A = hparams.A
-        self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
+        # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
 
         self.sigma = hparams.sigma
         # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
@@ -73,13 +73,14 @@ class RhoCMPS(CMPS):
     # Rho methods-PUBLIC
     # ====================
 
-    def rho_evolve_with_data(self, num_samples, data):
-        batch_zeros = tf.zeros([num_samples])
-        rho_0 = tf.stack(num_samples * [self.rho_0])
+    def rho_evolve_with_data(self):
+        batch_size = self.data_iterator.shape[0]
+        batch_zeros = tf.zeros([batch_size])
+        rho_0 = tf.stack(batch_size * [self.rho_0])
         # We switch to increments to evolve rho
-        data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])
-        rho, _, _ = tf.scan(self._rho_update, data,
+        incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
+        incs = tf.transpose(incs, [1, 0])
+        rho, _, _ = tf.scan(self._rho_update, incs,
                          initializer=(rho_0, batch_zeros, 0.), name="rho_scan_data_evolved")
         return rho
 
