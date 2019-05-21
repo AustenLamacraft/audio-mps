@@ -48,7 +48,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
         test_H_diag = tf.constant(np.random.rand(hparams.bond_dim).astype(dtype=np.float32))
         model = RhoCMPS(hparams, H_in=test_H_diag)
-        # TODO this test fails because one of the two, contains a trailing coma in the
+        # TODO this test fails because one of the two elements we are comparing, contains a trailing coma in the
         # TODO end, but otherwise the test is succesful.
         with self.cached_session() as sess:
 
