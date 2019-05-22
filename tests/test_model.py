@@ -36,7 +36,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            self.assertNotEqual(model.loss.eval(), np.nan)
+            assert not np.isnan(model.loss.eval())
 
     def testRho0IsADensityMatrix(self):
 
@@ -110,7 +110,7 @@ class TestPsiCMPS(tf.test.TestCase):
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            self.assertNotEqual(model.loss.eval(), np.nan)
+            assert not np.isnan(model.loss.eval())
 
     def testPsiEvolvedWithDataRemainsNormalized(self):
         data = get_audio(None, 'damped_sine', hparams)
