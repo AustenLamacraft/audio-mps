@@ -152,7 +152,7 @@ class RhoCMPS(CMPS):
     def _rho_and_loss_update(self, rho_loss_t, signal):
         rho, loss, t = rho_loss_t
         rho = self._update_ancilla_rho(rho, signal, t)
-        loss += self._inc_loss_rho(rho)
+        loss += self._inc_loss_rho(rho, signal, t)
         rho = self._normalize_rho(rho)
         t += self.dt
         return rho, loss, t
@@ -166,8 +166,8 @@ class RhoCMPS(CMPS):
         t += self.dt
         return rho, sample, t
 
-    def _inc_loss_rho(self, rho):
-        return - tf.log(tf.real(tf.trace(rho)))
+    def _inc_loss_rho(self, rho, signal, t):
+        return - tf.log(self._expectation(rho, t) * signal)
 
     def _update_ancilla_rho(self, rho, signal, t):
         # Note we do not normalize the state anymore in this method
@@ -267,7 +267,6 @@ class PsiCMPS(CMPS):
         return tf.reduce_mean(loss)
 
     def _psi_update(self, psi_loss_t, signal):
-        # TODO change name of first argument
         psi, loss, t = psi_loss_t
         psi = self._update_ancilla_psi(psi, signal, t) # signal is the increment
         psi = self._normalize_psi(psi, axis=1)
@@ -277,7 +276,7 @@ class PsiCMPS(CMPS):
     def _psi_and_loss_update(self, psi_loss_t, signal):
         psi, loss, t = psi_loss_t
         psi = self._update_ancilla_psi(psi, signal, t)
-        loss += self._inc_loss_psi(psi)
+        loss += self._inc_loss_psi(psi, signal, t)
         psi = self._normalize_psi(psi, axis=1)
         t += self.dt
         return psi, loss, t
@@ -291,8 +290,8 @@ class PsiCMPS(CMPS):
         t += self.dt
         return psi, sample, t
 
-    def _inc_loss_psi(self, psi):
-        return - tf.log(self._norm_square_psi(psi))
+    def _inc_loss_psi(self, psi, signal, t):
+        return - tf.log(self._expectation(psi, t) * signal)
 
     def _norm_square_psi(self, psi):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
