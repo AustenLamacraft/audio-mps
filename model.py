@@ -186,7 +186,6 @@ class RhoCMPS(CMPS):
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
         return new_rho
 
-
     def _expectation_RplusRdag_rho(self, rho, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
@@ -229,63 +228,68 @@ class PsiCMPS(CMPS):
     # Psi methods-PUBLIC
     # ====================
 
-    def psi_evolve_with_data(self, num_samples, data):
-        batch_zeros = tf.zeros([num_samples])
-        psi_0 = tf.stack(num_samples * [self.psi_0])
+    def psi_evolve_with_data(self):
+        batch_size = self.data_iterator.shape[0]
+        batch_zeros = tf.zeros([batch_size])
+        psi_0 = tf.stack(batch_size * [self.psi_0])
         # We switch to increments to evolve rho
-        data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])
-        psi, _ = tf.scan(self._psi_update, data,
-                         initializer=(psi_0, batch_zeros), name="psi_scan_data_evolved")
-        return psi
+        incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
+        incs = tf.transpose(incs, [1, 0])
+        psi, _, _ = tf.scan(self._psi_update, incs,
+                         initializer=(psi_0, batch_zeros, 0.), name="psi_scan_data_evolved")
+        return tf.transpose(psi, [1, 0, 2])
 
     def sample_psi(self, num_samples, length, temp=1):
         # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.stack(num_samples * [self.psi_0])
-        noise = tf.random_normal([length, num_samples], stddev=self.A * self.sigma * np.sqrt(temp * self.delta_t))
-        psi, samples = tf.scan(self._psi_and_sample_update, noise,
-                               initializer=(psi_0, batch_zeros), name="sample_scan")
+        noise = tf.random_normal([length, num_samples], stddev=self.sigma * np.sqrt(temp * self.delta_t))
+        psi, samples, _ = tf.scan(self._psi_and_sample_update, noise,
+                               initializer=(psi_0, batch_zeros, 0.), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
-        return tf.transpose(samples, [1, 0])
+        return self.A * tf.transpose(samples, [1, 0])
 
     # =====================
     # Psi methods-PRIVATE
     # =====================
 
     def _build_loss_psi(self, data):
-        batch_zeros = tf.zeros_like(data[:, 0])
-        psi_0 = tf.stack(self.batch_size * [self.psi_0])
+        batch_size = self.data_iterator.shape[0]
+        batch_zeros = tf.zeros([batch_size])
+        psi_0 = tf.stack(batch_size * [self.psi_0])
         loss = batch_zeros
         # We switch to increments
-        data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])  # foldl goes along the first dimension
-        _, loss = tf.foldl(self._psi_and_loss_update, data,
-                           initializer=(psi_0, loss), name="loss_fold")
+        incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
+        incs = tf.transpose(incs, [1, 0])  # foldl goes along the 1st dimension
+        _, loss, _ = tf.foldl(self._psi_and_loss_update, data,
+                           initializer=(psi_0, loss, 0.), name="loss_fold")
         return tf.reduce_mean(loss)
 
-    def _psi_update(self, psi_and_loss, signal):
+    def _psi_update(self, psi_loss_t, signal):
         # TODO change name of first argument
-        psi, loss = psi_and_loss
-        psi = self._update_ancilla_psi(psi, signal) # signal is the increment
+        psi, loss, t = psi_loss_t
+        psi = self._update_ancilla_psi(psi, signal, t) # signal is the increment
         psi = self._normalize_psi(psi, axis=1)
-        return psi, loss
+        t += self.dt
+        return psi, loss, t
 
-    def _psi_and_loss_update(self, psi_and_loss, signal):
-        psi, loss = psi_and_loss
-        psi = self._update_ancilla_psi(psi, signal)
+    def _psi_and_loss_update(self, psi_loss_t, signal):
+        psi, loss, t = psi_loss_t
+        psi = self._update_ancilla_psi(psi, signal, t)
         loss += self._inc_loss_psi(psi)
         psi = self._normalize_psi(psi, axis=1)
-        return psi, loss
+        t += self.dt
+        return psi, loss, t
 
-    def _psi_and_sample_update(self, psi_and_sample, noise):
-        psi, last_sample = psi_and_sample
-        new_sample = last_sample + self._expectation_RplusRdag_psi(psi) * self.A * self.delta_t + noise
-        increment = new_sample - last_sample
-        psi = self._update_ancilla_psi(psi, increment)  # Note update with increment
+    def _psi_and_sample_update(self, psi_sample_t, noise):
+        psi, last_sample, t = psi_sample_t
+        increment = self._expectation_RplusRdag_psi(psi, t) * self.delta_t + noise
+        sample += increment
+        psi = self._update_ancilla_psi(psi, increment, t)  # Note update with increment
         psi = self._normalize_psi(psi, axis=1)
-        return psi, new_sample
+        t += self.dt
+        return psi, sample, t
 
     def _inc_loss_psi(self, psi):
         return - tf.log(self._norm_square_psi(psi))
@@ -294,26 +298,39 @@ class PsiCMPS(CMPS):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
         return tf.real(exp)
 
-    def _update_ancilla_psi(self, psi, signal):
+    def _update_ancilla_psi(self, psi, signal, t):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal, dtype=tf.complex64)
-            batch_size = psi.shape[0]
-            H = tf.stack(batch_size * [self.H])
-            R = tf.stack(batch_size * [self.R])
-            one = tf.stack(batch_size * [tf.eye(self.bond_d, dtype=tf.complex64)])
-            IR = tf.einsum('a,bc->abc', signal, self.R)
-            R_dag = tf.linalg.adjoint(R)
-            Rpsi = tf.einsum('abc,ac->ab', R, psi)
-            RRdagpsi = - 0.5 * self.delta_t * self.sigma**2 * tf.einsum('abc,ac->ab', R_dag, Rpsi)
-            U_partial = one + (-1j * H * self.delta_t + IR / self.A)
-            Upartialpsi = tf.einsum('abc,ac->ab', U_partial, psi)
-            new_psi = Upartialpsi + RRdagpsi
-            return new_psi
+            signal = tf.cast(signal / self.A, dtype=tf.complex64)
+            t = tf.cast(t, dtype=tf.complex64)
+            phases = tf.exp(1j * self.freqsc * t)
+            Upsi = psi * tf.conj(phases)
 
-    def _expectation_RplusRdag_psi(self, psi):
+            Rdag = tf.linalg.adjoint(R)
+            RUpsi = tf.einsum('bc,ac->ab', R, Upsi)
+            RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
+
+            delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
+            delta_Upsi += signal * RUpsi
+            delta_psi = phases * delta_Upsi
+
+            return psi + delta_psi
+
+    def _expectation_RplusRdag_rho(self, rho, t):
         with tf.variable_scope("expectation"):
-            exp = tf.einsum('ab,bc,ac->a', tf.conj(psi), self.R, psi)
+            t = tf.cast(t, dtype=tf.complex64)
+            phases = tf.exp(1j * self.freqsc * t)
+            Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
+            x = tf.add(Rt, tf.linalg.adjoint(Rt))
+            exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
+            return tf.real(exp)
+
+    def _expectation_RplusRdag_psi(self, psi, t):
+        with tf.variable_scope("expectation"):
+            t = tf.cast(t, dtype=tf.complex64)
+            phases = tf.exp(1j * self.freqsc * t)
+            Upsi = psi * tf.conj(phases)
+            exp = tf.einsum('ab,bc,ac->a', tf.conj(Upsi), self.R, Upsi)
             return 2 * tf.real(exp)  # Conveniently returns a float
 
     def _normalize_psi(self, x, axis=None, epsilon=1e-12):
