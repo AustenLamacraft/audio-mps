@@ -67,7 +67,7 @@ class RhoCMPS(CMPS):
         self.rho_0 = self._rho_init(W_in)
 
         if self.data_iterator is not None:
-            self.loss = self._build_loss_rho(self.data_iterator)
+            self.loss = self._build_loss_rho()
 
     # ====================
     # Rho methods-PUBLIC
@@ -82,7 +82,7 @@ class RhoCMPS(CMPS):
         incs = tf.transpose(incs, [1, 0])
         rho, _, _ = tf.scan(self._rho_update, incs,
                          initializer=(rho_0, batch_zeros, 0.), name="rho_scan_data_evolved")
-        return rho
+        return tf.transpose(rho, [1, 0, 2, 3])
 
     def rho_evolve_with_sampling(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
@@ -90,7 +90,7 @@ class RhoCMPS(CMPS):
         noise = tf.random_normal([length, num_samples], stddev=self.sigma * np.sqrt(temp * self.delta_t))
         rho, samples, _ = tf.scan(self._rho_and_sample_update, noise,
                                initializer=(rho_0, batch_zeros, 0.), name="rho_scan")
-        return rho
+        return tf.transpose(rho, [1, 0, 2, 3])
 
     def purity(self, num_samples, length, temp=1):
         batch_zeros = tf.zeros([num_samples])
@@ -129,14 +129,15 @@ class RhoCMPS(CMPS):
         rho_0 = rho_0 / tf.trace(rho_0)
         return rho_0
 
-    def _build_loss_rho(self, data):
-        batch_zeros = tf.zeros_like(data[:, 0])
-        rho_0 = tf.stack(self.batch_size * [self.rho_0])
+    def _build_loss_rho(self):
+        batch_size = self.data_iterator.shape[0]
+        batch_zeros = tf.zeros([batch_size])
+        rho_0 = tf.stack(batch_size * [self.rho_0])
         loss = batch_zeros
         # We switch to increments
-        data = data[:, 1:] - data[:, :-1]
-        data = tf.transpose(data, [1, 0])  # foldl goes along the 1st dimension
-        _, loss, _ = tf.foldl(self._rho_and_loss_update, data,
+        incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
+        incs = tf.transpose(incs, [1, 0])  # foldl goes along the 1st dimension
+        _, loss, _ = tf.foldl(self._rho_and_loss_update, incs,
                            initializer=(rho_0, loss, 0.), name="loss_fold")
         return tf.reduce_mean(loss)
 
