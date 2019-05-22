@@ -262,7 +262,7 @@ class PsiCMPS(CMPS):
         # We switch to increments
         incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
         incs = tf.transpose(incs, [1, 0])  # foldl goes along the 1st dimension
-        _, loss, _ = tf.foldl(self._psi_and_loss_update, data,
+        _, loss, _ = tf.foldl(self._psi_and_loss_update, incs,
                            initializer=(psi_0, loss, 0.), name="loss_fold")
         return tf.reduce_mean(loss)
 
@@ -283,7 +283,7 @@ class PsiCMPS(CMPS):
         return psi, loss, t
 
     def _psi_and_sample_update(self, psi_sample_t, noise):
-        psi, last_sample, t = psi_sample_t
+        psi, sample, t = psi_sample_t
         increment = self._expectation_RplusRdag_psi(psi, t) * self.delta_t + noise
         sample += increment
         psi = self._update_ancilla_psi(psi, increment, t)  # Note update with increment
@@ -306,8 +306,8 @@ class PsiCMPS(CMPS):
             phases = tf.exp(1j * self.freqsc * t)
             Upsi = psi * tf.conj(phases)
 
-            Rdag = tf.linalg.adjoint(R)
-            RUpsi = tf.einsum('bc,ac->ab', R, Upsi)
+            Rdag = tf.linalg.adjoint(self.R)
+            RUpsi = tf.einsum('bc,ac->ab', self.R, Upsi)
             RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
 
             delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
