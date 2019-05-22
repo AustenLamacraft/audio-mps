@@ -15,7 +15,7 @@ tf.set_random_seed(0)
 FLAGS = tf.flags.FLAGS
 
 # Model flags
-tf.flags.DEFINE_enum('mps_model', 'rho_mps',
+tf.flags.DEFINE_enum('mps_model', 'psi_mps',
                      ['rho_mps', 'psi_mps'],
                      'MPS mdoel. Must be one of "rho_mps" or "psi_mps".')
 
@@ -76,7 +76,7 @@ def main(argv):
             tf.summary.image("data_waveform", data_waveform_op)
 
             if FLAGS.num_samples != 0:
-                samples = model.sample_rho(FLAGS.num_samples, FLAGS.sample_duration)
+                samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
                 sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
                 tf.summary.image("sample_waveform", sample_waveform_op)
 

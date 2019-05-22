@@ -100,7 +100,7 @@ class RhoCMPS(CMPS):
                                initializer=(rho_0, batch_zeros, 0.), name="purity_scan")
         return tf.real(tf.transpose(tf.trace(tf.einsum('abcd,abde->abce', rho, rho)), [1, 0]))
 
-    def sample_rho(self, num_samples, length, temp=1):
+    def sample(self, num_samples, length, temp=1):
         # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         rho_0 = tf.stack(num_samples * [self.rho_0])
@@ -159,7 +159,7 @@ class RhoCMPS(CMPS):
 
     def _rho_and_sample_update(self, rho_sample_t, noise):
         rho, sample, t = rho_sample_t
-        increment = self._expectation_RplusRdag_rho(rho, t) * self.delta_t + noise
+        increment = self._expectation(rho, t) * self.delta_t + noise
         sample += increment
         rho = self._update_ancilla_rho(rho, increment, t) # Note update with increment
         rho = self._normalize_rho(rho)
@@ -186,7 +186,7 @@ class RhoCMPS(CMPS):
             new_rho = tf.einsum('abc,acd,ade->abe', U, rho, U_dag)
         return new_rho
 
-    def _expectation_RplusRdag_rho(self, rho, t):
+    def _expectation(self, rho, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
             phases = tf.exp(1j * self.freqsc * t)
@@ -239,7 +239,7 @@ class PsiCMPS(CMPS):
                          initializer=(psi_0, batch_zeros, 0.), name="psi_scan_data_evolved")
         return tf.transpose(psi, [1, 0, 2])
 
-    def sample_psi(self, num_samples, length, temp=1):
+    def sample(self, num_samples, length, temp=1):
         # Note we sample X_t and not increments (X_(t+1) - X_t)
         batch_zeros = tf.zeros([num_samples])
         psi_0 = tf.stack(num_samples * [self.psi_0])
@@ -284,7 +284,7 @@ class PsiCMPS(CMPS):
 
     def _psi_and_sample_update(self, psi_sample_t, noise):
         psi, sample, t = psi_sample_t
-        increment = self._expectation_RplusRdag_psi(psi, t) * self.delta_t + noise
+        increment = self._expectation(psi, t) * self.delta_t + noise
         sample += increment
         psi = self._update_ancilla_psi(psi, increment, t)  # Note update with increment
         psi = self._normalize_psi(psi, axis=1)
@@ -311,21 +311,13 @@ class PsiCMPS(CMPS):
             RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
 
             delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
-            delta_Upsi += signal * RUpsi
+            delta_Upsi += tf.expand_dims(signal, axis=1) * RUpsi
+
             delta_psi = phases * delta_Upsi
 
             return psi + delta_psi
 
-    def _expectation_RplusRdag_rho(self, rho, t):
-        with tf.variable_scope("expectation"):
-            t = tf.cast(t, dtype=tf.complex64)
-            phases = tf.exp(1j * self.freqsc * t)
-            Rt = tf.einsum('a,ab,b->ab', phases, self.R, tf.conj(phases))
-            x = tf.add(Rt, tf.linalg.adjoint(Rt))
-            exp = tf.trace(tf.einsum('ab,cbd->cad', x, rho))
-            return tf.real(exp)
-
-    def _expectation_RplusRdag_psi(self, psi, t):
+    def _expectation(self, psi, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
             phases = tf.exp(1j * self.freqsc * t)

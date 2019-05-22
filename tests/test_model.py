@@ -10,7 +10,7 @@ tf.flags.DEFINE_integer("sample_duration", 2**8, "Duration of samples (as intege
 tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
 FLAGS = tf.flags.FLAGS
 
-hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001, initial_rank=None, A=1.,
+hparams = HParams(minibatch_size=8, bond_dim=7, delta_t=1/FLAGS.sample_rate, sigma=0.0001, initial_rank=None, A=1.,
                   h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2)
 
 
@@ -23,7 +23,6 @@ class TestCMPS(tf.test.TestCase):
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(tf.matrix_diag_part(model.R.eval()), hparams.bond_dim * [0.])
-
 
 if __name__ == '__main__':
       tf.test.main()
@@ -97,7 +96,7 @@ class TestRhoCMPS(tf.test.TestCase):
 
         qubit = RhoCMPS(hparams, R_in=R, freqs_in=freqs)
 
-        waveform = qubit.sample_rho(num_samples=2, length=512)
+        waveform = qubit.sample(num_samples=2, length=512)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -152,7 +151,7 @@ class TestPsiCMPS(tf.test.TestCase):
 
         qubit = PsiCMPS(hparams, R_in=R, freqs_in=freqs)
 
-        waveform = qubit.sample_psi(num_samples=2, length=512)
+        waveform = qubit.sample(num_samples=2, length=512)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
