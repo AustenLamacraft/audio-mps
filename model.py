@@ -167,7 +167,7 @@ class RhoCMPS(CMPS):
         return rho, sample, t
 
     def _inc_loss_rho(self, rho, signal, t):
-        return - tf.log(self._expectation(rho, t) * signal)
+        return - tf.log(1. + self._expectation(rho, t) * signal)
 
     def _update_ancilla_rho(self, rho, signal, t):
         # Note we do not normalize the state anymore in this method
@@ -291,7 +291,7 @@ class PsiCMPS(CMPS):
         return psi, sample, t
 
     def _inc_loss_psi(self, psi, signal, t):
-        return - tf.log(self._expectation(psi, t) * signal)
+        return - tf.log(1. + self._expectation(psi, t) * signal)
 
     def _norm_square_psi(self, psi):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
