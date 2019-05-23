@@ -15,7 +15,7 @@ tf.set_random_seed(0)
 FLAGS = tf.flags.FLAGS
 
 # Model flags
-tf.flags.DEFINE_enum('mps_model', 'rho_mps',
+tf.flags.DEFINE_enum('mps_model', 'psi_mps',
                      ['rho_mps', 'psi_mps'],
                      'MPS mdoel. Must be one of "rho_mps" or "psi_mps".')
 
@@ -34,9 +34,13 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 
 def main(argv):
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.000001,
-                      h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate),
-                      initial_rank=None, A=1., learning_rate=0.001)
+    # hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.000001,
+    #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
+    #                   initial_rank=None, A=100., learning_rate=0.001)
+
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
+                      h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
+                      initial_rank=None, A=100., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -48,7 +52,7 @@ def main(argv):
         else:
             model = PsiCMPS(hparams=hparams, data_iterator=data)
 
-        h_l2sqnorm = tf.reduce_sum(tf.square(model.H_diag))
+        h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
         r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
     with tf.variable_scope("total_loss"):
@@ -68,7 +72,7 @@ def main(argv):
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
         tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
-        tf.summary.histogram("frequencies", model.H_diag / (2 * np.pi))
+        tf.summary.histogram("frequencies", model.freqs / (2 * np.pi))
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
@@ -76,7 +80,7 @@ def main(argv):
             tf.summary.image("data_waveform", data_waveform_op)
 
             if FLAGS.num_samples != 0:
-                samples = model.sample_rho(FLAGS.num_samples, FLAGS.sample_duration)
+                samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
                 sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
                 tf.summary.image("sample_waveform", sample_waveform_op)
 
