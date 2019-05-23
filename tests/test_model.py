@@ -11,7 +11,7 @@ tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
 FLAGS = tf.flags.FLAGS
 
 hparams = HParams(minibatch_size=8, bond_dim=7, delta_t=1/FLAGS.sample_rate, sigma=0.0001, initial_rank=None, A=100.,
-                  h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate)**2)
+                  h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate))
 
 
 class TestCMPS(tf.test.TestCase):
@@ -88,7 +88,7 @@ class TestRhoCMPS(tf.test.TestCase):
         """
 
         hparams = HParams(minibatch_size=8, bond_dim=2, delta_t=1 / FLAGS.sample_rate, sigma=1, initial_rank=None, A=1.,
-                          h_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, r_reg=2 / (np.pi * FLAGS.sample_rate) ** 2)
+                          h_reg=2 / (np.pi * FLAGS.sample_rate) ** 2, r_reg=2 / (np.pi * FLAGS.sample_rate))
 
         ω = 10
         R = np.array([[0, 1], [0, 0]], dtype=np.complex64)
