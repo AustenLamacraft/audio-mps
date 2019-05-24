@@ -24,9 +24,6 @@ class TestCMPS(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(tf.matrix_diag_part(model.R.eval()), hparams.bond_dim * [0.])
 
-if __name__ == '__main__':
-      tf.test.main()
-
 
 class TestRhoCMPS(tf.test.TestCase):
 
@@ -102,6 +99,7 @@ class TestRhoCMPS(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertEqual(waveform.eval().shape, (2, 512))
 
+
 class TestPsiCMPS(tf.test.TestCase):
 
     def testLossNotNaN(self):
@@ -156,3 +154,7 @@ class TestPsiCMPS(tf.test.TestCase):
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             self.assertEqual(waveform.eval().shape, (2, 512))
+
+
+if __name__ == '__main__':
+      tf.test.main()
