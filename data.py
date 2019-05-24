@@ -20,7 +20,7 @@ def get_audio(datadir, dataset, hps):
                                  * tf.sin(2 * np.pi * freq * times) * tf.exp(- times / decay_time)
 
         data = sine_wave_random_delay
-
+        datalog = f"freq{freq}_dect{decay_time}_delt{delay_time}"
 
     else:
 
@@ -42,5 +42,5 @@ def get_audio(datadir, dataset, hps):
 
         data = batch['audio']
 
-    return data
+    return data, datalog
 
