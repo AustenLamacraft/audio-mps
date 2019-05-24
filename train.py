@@ -31,6 +31,8 @@ tf.flags.DEFINE_integer('num_samples', 3, 'Number of samples to generate.')
 tf.flags.DEFINE_string("hparams", "", 'Comma separated list of "name=value" pairs e.g. "--hparams=learning_rate=0.3"')
 tf.flags.DEFINE_string("datadir", "./data", "Data directory.")
 tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Directory to write logs.")
+# TODO
+tf.flags.DEFINE_string('filename', 'flags', 'Input file name.', short_name='f')
 
 
 def main(argv):
@@ -38,13 +40,14 @@ def main(argv):
     #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
     #                   initial_rank=None, A=100., learning_rate=0.001)
 
+
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
                       initial_rank=None, A=100., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
-        data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
+        data, datalog = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
         if FLAGS.mps_model == 'rho_mps':
@@ -91,7 +94,13 @@ def main(argv):
     # TODO Unrolling in time?
 
     tf.contrib.training.train(train_op, save_checkpoint_secs=60,
-                              logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
+                              logdir=f"{FLAGS.logdir}/"
+                                     f"D{hparams.bond_dim}"
+                                     f"_dt{hparams.delta_t}"
+                                     f"_bs{hparams.minibatch_size}"
+                                     f"_sg{hparams.sigma}"
+                                     f"_sampdur{FLAGS.sample_duration}_"
+                                     +datalog)
 
 if __name__ == '__main__':
     tf.app.run(main)
