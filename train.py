@@ -24,7 +24,7 @@ tf.flags.DEFINE_enum('dataset', 'damped_sine',
                      ['damped_sine', 'guitar', 'organ', 'nsynth'],
                      'Dataset. Must be one of "damped_sine", "guitar", "organ", or "nsynth".')
 
-tf.flags.DEFINE_integer("sample_duration", 2**16, "Duration of samples (as integer).")
+tf.flags.DEFINE_integer("sample_duration", 10, "Duration of samples (as integer).")
 tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
 tf.flags.DEFINE_boolean('visualize', True, 'Produce visualization. Probably slow!')
 tf.flags.DEFINE_integer('num_samples', 3, 'Number of samples to generate.')
