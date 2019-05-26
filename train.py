@@ -63,7 +63,7 @@ def main(argv):
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("A", tf.cast(model.A, dtype=tf.float32))
-        tf.summary.scalar("sigma", tf.cast(model.sigma, dtype=tf.float32))
+        # tf.summary.scalar("sigma", tf.cast(model.sigma, dtype=tf.float32))
         tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
         tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
 
@@ -98,7 +98,8 @@ def main(argv):
                                      f"_dt{hparams.delta_t}"
                                      f"_bs{hparams.minibatch_size}"
                                      f"_sg{hparams.sigma}"
-                                     f"_sampdur{FLAGS.sample_duration}_"
+                                     f"_sampdur{FLAGS.sample_duration}"
+                                     f"_{FLAGS.mps_model}"
                                      +datalog)
 
 if __name__ == '__main__':
