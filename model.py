@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from utils import symmetrize
+# from utils import symmetrize
 
 class CMPS:
     """
