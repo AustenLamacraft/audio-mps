@@ -42,7 +42,7 @@ def main(argv):
 
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
-                      initial_rank=None, A=100., learning_rate=0.001)
+                      initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -99,8 +99,7 @@ def main(argv):
                                      f"_bs{hparams.minibatch_size}"
                                      f"_sg{hparams.sigma}"
                                      f"_sampdur{FLAGS.sample_duration}"
-                                     f"_{FLAGS.mps_model}"
-                                     +datalog)
+                                     +datalog+f"_{FLAGS.mps_model}")
 
 if __name__ == '__main__':
     tf.app.run(main)
