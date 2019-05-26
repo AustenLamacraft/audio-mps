@@ -8,8 +8,9 @@ def get_audio(datadir, dataset, hps):
     if dataset == 'damped_sine':
 
         input_length = FLAGS.sample_duration
-        freq = 261.6 # Middle C
-        decay_time = 0.1
+        # freq = 261.6 # Middle C
+        freq = 400.  # Middle C
+        decay_time = 0.003
         delay_time = input_length / 100
 
         delays = tf.stack(input_length * [tf.random_gamma([hps.minibatch_size], alpha=2, beta=2/delay_time)], axis=-1)
