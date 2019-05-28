@@ -16,7 +16,7 @@ class CMPS:
         self.dt = tf.constant(hparams.delta_t, tf.float32) # Needed for increments
 
         self.A = hparams.A
-        # self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
+        self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
 
         self.sigma = hparams.sigma
         # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
