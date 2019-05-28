@@ -151,8 +151,12 @@ class RhoCMPS(CMPS):
 
     def _rho_and_loss_update(self, rho_loss_t, signal):
         rho, loss, t = rho_loss_t
-        rho = self._update_ancilla_rho(rho, signal, t)
+        #TODO delete when finished
+        # rho = self._update_ancilla_rho(rho, signal, t)
+        # loss += self._inc_loss_rho(rho, signal, t)
+        # rho = self._normalize_rho(rho)
         loss += self._inc_loss_rho(rho, signal, t)
+        rho = self._update_ancilla_rho(rho, signal, t)
         rho = self._normalize_rho(rho)
         t += self.dt
         return rho, loss, t
@@ -167,7 +171,8 @@ class RhoCMPS(CMPS):
         return rho, sample, t
 
     def _inc_loss_rho(self, rho, signal, t):
-        return - tf.log(1. + self._expectation(rho, t) * signal / self.A)
+        # return - tf.log(1. + self._expectation(rho, t) * signal / self.A)
+        return - self._expectation(rho, t) * signal + 0.5 * self.A * (self._expectation(rho, t))**2 * self.dt
 
     def _update_ancilla_rho(self, rho, signal, t):
         # Note we do not normalize the state anymore in this method
@@ -275,13 +280,18 @@ class PsiCMPS(CMPS):
 
     def _psi_and_loss_update(self, psi_loss_t, signal):
         psi, loss, t = psi_loss_t
-        psi = self._update_ancilla_psi(psi, signal, t)
+        #TODO delete this once all is finished
+        # psi = self._update_ancilla_psi(psi, signal, t)
+        # loss += self._inc_loss_psi(psi, signal, t)
+        # psi = self._normalize_psi(psi, axis=1)
         loss += self._inc_loss_psi(psi, signal, t)
+        psi = self._update_ancilla_psi(psi, signal, t)
         psi = self._normalize_psi(psi, axis=1)
         t += self.dt
         return psi, loss, t
 
     def _psi_and_sample_update(self, psi_sample_t, noise):
+        #TODO update to new model
         psi, sample, t = psi_sample_t
         increment = self._expectation(psi, t) * self.delta_t + noise
         sample += increment
@@ -291,7 +301,9 @@ class PsiCMPS(CMPS):
         return psi, sample, t
 
     def _inc_loss_psi(self, psi, signal, t):
-        return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
+        #TODO delete when finished
+        # return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
+        return - self._expectation(psi, t) * signal + 0.5 * self.A * (self._expectation(psi, t)**2) * self.dt
 
     def _norm_square_psi(self, psi):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
