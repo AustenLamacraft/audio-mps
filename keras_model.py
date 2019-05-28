@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from utils import symmetrize
+from utils import symmetrize, normalize_psi
 from tensorflow.keras.initializers import RandomNormal, Constant
 from tensorflow.keras.regularizers import L1L2
 
@@ -13,7 +13,7 @@ class CMPSCell(tf.keras.layers.Layer):
         super(CMPSCell, self).__init__(**kwargs)
 
         self.bond_d = hparams.bond_dim
-        self.batch_size = hparams.minibatch_size
+
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
@@ -71,29 +71,11 @@ class PsiCMPSCell(CMPSCell):
         super(PsiCMPSCell, self).__init__(hparams, *args, **kwargs)
         self.psi_in = psi_in
 
-    def build(self):
-        super(PsiCMPSCell, self).build()
-
-        if self.psi_in is not None:
-            psi_real_init = Constant(self.psi_in.real)
-            psi_imag_init = Constant(self.psi_in.real)
-        else:
-            psi_real_init = None
-            psi_imag_init = None
-
-        psi_x = self.add_variable("psi_x", shape=[self.bond_d],
-                                  dtype=tf.float32, initializer=psi_real_init)
-        psi_y = self.add_variable("psi_y", shape=[self.bond_d],
-                                  dtype=tf.float32, initializer=psi_imag_init)
-
-        self.psi_0 = tf.complex(psi_x, psi_y)
-        self.psi_0 = self._normalize_psi(self.psi_0)  # No need of axis=1 because this is not a batch of psis
-
     def call(self, signal, psi_loss_t):
         psi, loss, t = psi_loss_t
         psi = self._update_ancilla_psi(psi, signal, t)
         loss += self._inc_loss_psi(psi, signal, t)
-        psi = self._normalize_psi(psi, axis=1)
+        psi = normalize_psi(psi, axis=1)
         t += self.dt
         return _, [psi, loss, t]
 
@@ -127,13 +109,38 @@ class PsiCMPSCell(CMPSCell):
             exp = tf.einsum('ab,bc,ac->a', tf.conj(Upsi), self.R, Upsi)
             return 2 * tf.real(exp)  # Conveniently returns a float
 
-    def _normalize_psi(self, x, axis=None, epsilon=1e-12):
-        #TODO change the method so that it ise clear that the argument axis changes whether we normalize a single psi
-        #TODO or a batch of psis
-        with tf.variable_scope("normalize"):
-            square_sum = tf.reduce_sum(tf.square(tf.abs(x)), axis, keepdims=True)
-            x_inv_norm = tf.rsqrt(tf.maximum(square_sum, epsilon))
-            x_inv_norm = tf.cast(x_inv_norm, tf.complex64)
-            return tf.multiply(x, x_inv_norm)
 
+class SchrodingerRNN(tf.keras.layers.RNN):
+    def __init__(self, hparams):
+        self.bond_d = hparams.bond_dim
+        cell = PsiCMPSCell(hparams)
+        super(SchrodingerRNN, self).__init__(cell) # Note that batch major is the default
+
+    def build(self):
+        super(PsiCMPSCell, self).build()
+
+        if self.psi_in is not None:
+            psi_real_init = Constant(self.psi_in.real)
+            psi_imag_init = Constant(self.psi_in.real)
+        else:
+            psi_real_init = None
+            psi_imag_init = None
+
+        psi_x = self.add_variable("psi_x", shape=[self.bond_d],
+                                  dtype=tf.float32, initializer=psi_real_init)
+        psi_y = self.add_variable("psi_y", shape=[self.bond_d],
+                                  dtype=tf.float32, initializer=psi_imag_init)
+
+        self.psi_0 = tf.complex(psi_x, psi_y)
+        self.psi_0 = normalize_psi(self.psi_0)  # No need of axis=1 because this is not a batch of psis
+
+    def call(self, signal):
+        batch_size = signal.shape[0]
+        psi_0 = tf.stack(batch_size * [self.psi_0])
+        batch_zeros = tf.zeros([batch_size])
+        loss = batch_zeros
+        psi_loss_t = (psi_0, loss, 0.)
+        incs = signal[:, 1:] - signal[:, :-1]
+        res = super(PsiCMPSCell, self).call(incs, initial_state=psi_loss_t)
+        return res[1] # the loss
 
