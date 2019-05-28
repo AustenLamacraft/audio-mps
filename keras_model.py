@@ -13,7 +13,7 @@ class CMPSCell(tf.keras.layers.Layer):
         super(CMPSCell, self).__init__(**kwargs)
 
         self.bond_d = hparams.bond_dim
-
+        self.batch_size = hparams.minibatch_size
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
@@ -69,15 +69,42 @@ class CMPSCell(tf.keras.layers.Layer):
 class PsiCMPSCell(CMPSCell):
     def __init__(self, hparams, psi_in=None, *args, **kwargs):
         super(PsiCMPSCell, self).__init__(hparams, *args, **kwargs)
+
         self.psi_in = psi_in
+        self.state_size = (hparams.bond_dim, 1, 1)
+        self.output_size = 1
+
+    def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
+        """
+        State has format (psi_0, loss, time) 
+        """
+        if self.psi_in is not None:
+            psi_real_init = Constant(self.psi_in.real)
+            psi_imag_init = Constant(self.psi_in.real)
+        else:
+            psi_real_init = None
+            psi_imag_init = None
+
+        psi_x = self.add_variable("psi_x", shape=[self.bond_d],
+                                  dtype=dtype, initializer=psi_real_init)
+        psi_y = self.add_variable("psi_y", shape=[self.bond_d],
+                                  dtype=dtype, initializer=psi_imag_init)
+
+        psi_0 = tf.complex(psi_x, psi_y)
+        psi_0 = normalize_psi(psi_0)  # No need of axis=1 because this is not a batch of psis
+
+        state = tf.stack(batch_size * (psi_0, 0., 0.))
+        return state
 
     def call(self, signal, psi_loss_t):
-        psi, loss, t = psi_loss_t
+        psi = psi_loss_t[:, 0]
+        loss = psi_loss_t[:, 1]
+        t = psi_loss_t[:, 2]
         psi = self._update_ancilla_psi(psi, signal, t)
         loss += self._inc_loss_psi(psi, signal, t)
         psi = normalize_psi(psi, axis=1)
         t += self.dt
-        return _, [psi, loss, t]
+        return loss, [psi, loss, t]
 
     def _inc_loss_psi(self, psi, signal, t):
         return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
@@ -114,33 +141,10 @@ class SchrodingerRNN(tf.keras.layers.RNN):
     def __init__(self, hparams):
         self.bond_d = hparams.bond_dim
         cell = PsiCMPSCell(hparams)
-        super(SchrodingerRNN, self).__init__(cell) # Note that batch major is the default
-
-    def build(self):
-        super(PsiCMPSCell, self).build()
-
-        if self.psi_in is not None:
-            psi_real_init = Constant(self.psi_in.real)
-            psi_imag_init = Constant(self.psi_in.real)
-        else:
-            psi_real_init = None
-            psi_imag_init = None
-
-        psi_x = self.add_variable("psi_x", shape=[self.bond_d],
-                                  dtype=tf.float32, initializer=psi_real_init)
-        psi_y = self.add_variable("psi_y", shape=[self.bond_d],
-                                  dtype=tf.float32, initializer=psi_imag_init)
-
-        self.psi_0 = tf.complex(psi_x, psi_y)
-        self.psi_0 = normalize_psi(self.psi_0)  # No need of axis=1 because this is not a batch of psis
+        super(SchrodingerRNN, self).__init__(cell, return_state=False) # Note that batch major is the default
 
     def call(self, signal):
-        batch_size = signal.shape[0]
-        psi_0 = tf.stack(batch_size * [self.psi_0])
-        batch_zeros = tf.zeros([batch_size])
-        loss = batch_zeros
-        psi_loss_t = (psi_0, loss, 0.)
         incs = signal[:, 1:] - signal[:, :-1]
-        res = super(PsiCMPSCell, self).call(incs, initial_state=psi_loss_t)
-        return res[1] # the loss
+        return super(PsiCMPSCell, self).call(incs)
+
 

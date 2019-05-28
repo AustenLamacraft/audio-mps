@@ -47,7 +47,5 @@ class TestPsiCMPSCell(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(tf.matrix_diag_part(model.R.eval()), hparams.bond_dim * [0.])
 
-
-
 if __name__ == '__main__':
       tf.test.main()
