@@ -111,6 +111,24 @@ class RhoCMPS(CMPS):
         # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
         return self.A * tf.transpose(samples, [1, 0])
 
+    def sample_filtered(self, num_samples, length, temp=1, λ=1):
+
+        def _OU_increments():
+            noise = tf.random_normal([length, num_samples],
+                                     stddev=self.sigma * temp * tf.sqrt(1 - tf.exp(-2 * λ * self.delta_t)))
+            z_init = tf.random_normal([num_samples], stddev=self.sigma * temp)
+            OU = tf.scan(lambda z, q: tf.exp(-λ * self.delta_t) * z + q, elems=noise, initializer=z_init)
+            OU_increments = OU[1:] - OU[:-1]
+            return OU_increments
+
+        batch_zeros = tf.zeros([num_samples])
+        rho_0 = tf.stack(num_samples * [self.rho_0])
+
+        rho, samples, _ = tf.scan(self._rho_and_sample_update, _OU_increments(),
+                                  initializer=(rho_0, batch_zeros, 0.), name="sample_scan")
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        return tf.transpose(samples, [1, 0])
+
     # =====================
     # Rho methods-PRIVATE
     # =====================
@@ -163,7 +181,7 @@ class RhoCMPS(CMPS):
 
     def _rho_and_sample_update(self, rho_sample_t, noise):
         rho, sample, t = rho_sample_t
-        increment = self._expectation(rho, t) * self.delta_t + noise
+        increment = self.A * self._expectation(rho, t) * self.delta_t + noise
         sample += increment
         rho = self._update_ancilla_rho(rho, increment, t) # Note update with increment
         rho = self._normalize_rho(rho)
@@ -253,7 +271,25 @@ class PsiCMPS(CMPS):
                                initializer=(psi_0, batch_zeros, 0.), name="sample_scan")
         # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
         # TODO check batch_zeros is the right initializer. I think it is if I define X_0 = 0.
-        return self.A * tf.transpose(samples, [1, 0])
+        return tf.transpose(samples, [1, 0])
+
+    def sample_filtered(self, num_samples, length, temp=1, λ=1):
+
+        def _OU_increments():
+            noise = tf.random_normal([length, num_samples],
+                                     stddev=self.sigma * temp * tf.sqrt(1 - tf.exp(-2 * λ * self.delta_t)))
+            z_init = tf.random_normal([num_samples], stddev=self.sigma * temp)
+            OU = tf.scan(lambda z, q: tf.exp(-λ * self.delta_t) * z + q, elems=noise, initializer=z_init)
+            OU_increments = OU[1:]-OU[:-1]
+            return OU_increments
+
+        batch_zeros = tf.zeros([num_samples])
+        psi_0 = tf.stack(num_samples * [self.psi_0])
+
+        psi, samples, _ = tf.scan(self._psi_and_sample_update, _OU_increments(),
+                               initializer=(psi_0, batch_zeros, 0.), name="sample_scan")
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        return tf.transpose(samples, [1, 0])
 
     # =====================
     # Psi methods-PRIVATE
@@ -291,11 +327,10 @@ class PsiCMPS(CMPS):
         return psi, loss, t
 
     def _psi_and_sample_update(self, psi_sample_t, noise):
-        #TODO update to new model
         psi, sample, t = psi_sample_t
-        increment = self._expectation(psi, t) * self.delta_t + noise
+        increment = self.A * self._expectation(psi, t) * self.delta_t + noise
         sample += increment
-        psi = self._update_ancilla_psi(psi, increment, t)  # Note update with increment
+        psi = self._update_ancilla_psi(psi, increment, t)
         psi = self._normalize_psi(psi, axis=1)
         t += self.dt
         return psi, sample, t
