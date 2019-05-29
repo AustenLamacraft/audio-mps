@@ -10,14 +10,13 @@ class CMPSCell(tf.keras.layers.Layer):
     """
 
     def __init__(self, hparams, freqs_in=None, R_in=None, **kwargs):
-        super(CMPSCell, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.bond_d = hparams.bond_dim
-        self.batch_size = hparams.minibatch_size
+
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
-        self.dt = tf.constant(hparams.delta_t, tf.float32)  # Needed for increments
 
         self.A = hparams.A
         self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
@@ -29,7 +28,7 @@ class CMPSCell(tf.keras.layers.Layer):
         self.freqs_in = freqs_in
         self.R_in = R_in
 
-    def build(self):
+    def build(self, _): # Build requires input_shape argument
 
         # ======================================================
         # Training variables (cannot be complex)
@@ -68,16 +67,14 @@ class CMPSCell(tf.keras.layers.Layer):
 
 class PsiCMPSCell(CMPSCell):
     def __init__(self, hparams, psi_in=None, *args, **kwargs):
-        super(PsiCMPSCell, self).__init__(hparams, *args, **kwargs)
+        super().__init__(hparams, *args, **kwargs)
 
         self.psi_in = psi_in
-        self.state_size = (hparams.bond_dim, 1, 1)
+        self.state_size = hparams.bond_dim
         self.output_size = 1
 
-    def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
-        """
-        State has format (psi_0, loss, time) 
-        """
+    def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
+
         if self.psi_in is not None:
             psi_real_init = Constant(self.psi_in.real)
             psi_imag_init = Constant(self.psi_in.real)
@@ -92,29 +89,32 @@ class PsiCMPSCell(CMPSCell):
 
         psi_0 = tf.complex(psi_x, psi_y)
         psi_0 = normalize_psi(psi_0)  # No need of axis=1 because this is not a batch of psis
-
-        state = tf.stack(batch_size * (psi_0, 0., 0.))
+        psi_0 = tf.expand_dims(psi_0, axis=0)
+        state = tf.tile(psi_0, [batch_size, 1])
+        # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
         return state
 
-    def call(self, signal, psi_loss_t):
-        psi = psi_loss_t[:, 0]
-        loss = psi_loss_t[:, 1]
-        t = psi_loss_t[:, 2]
-        psi = self._update_ancilla_psi(psi, signal, t)
-        loss += self._inc_loss_psi(psi, signal, t)
+    def call(self, input, psi):
+        psi = psi[0] # Keras RNN expect the states in a list, even if it's a single state tensor.
+        psi = self._update_ancilla_psi(psi, input)
+        loss = self._inc_loss_psi(psi, input)
         psi = normalize_psi(psi, axis=1)
-        t += self.dt
-        return loss, [psi, loss, t]
+        return loss, [psi]
 
-    def _inc_loss_psi(self, psi, signal, t):
+    def _inc_loss_psi(self, psi, signal_time):
+        signal = signal_time[:, 0]
+        t = signal_time[:, 0]
         return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
 
-    def _update_ancilla_psi(self, psi, signal, t):
-        # Note we do not normalize the state anymore in this method
+    def _update_ancilla_psi(self, psi, signal_time):
         with tf.variable_scope("update_ancilla"):
+            signal = signal_time[:, 0]
+            t = signal_time[:, 1]
             signal = tf.cast(signal / self.A, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
-            phases = tf.exp(1j * self.freqsc * t)
+            t = tf.expand_dims(t, axis=1)
+            freqsc = tf.expand_dims(self.freqsc, axis=0)
+            phases = tf.exp(1j * freqsc * t)
             Upsi = psi * tf.conj(phases)
 
             Rdag = tf.linalg.adjoint(self.R)
@@ -131,20 +131,30 @@ class PsiCMPSCell(CMPSCell):
     def _expectation(self, psi, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
-            phases = tf.exp(1j * self.freqsc * t)
+            t = tf.expand_dims(t, axis=1)
+            freqsc = tf.expand_dims(self.freqsc, axis=0)
+            phases = tf.exp(1j * freqsc * t)
             Upsi = psi * tf.conj(phases)
             exp = tf.einsum('ab,bc,ac->a', tf.conj(Upsi), self.R, Upsi)
             return 2 * tf.real(exp)  # Conveniently returns a float
 
 
 class SchrodingerRNN(tf.keras.layers.RNN):
-    def __init__(self, hparams):
-        self.bond_d = hparams.bond_dim
+    def __init__(self, hparams, **kwargs):
         cell = PsiCMPSCell(hparams)
-        super(SchrodingerRNN, self).__init__(cell, return_state=False) # Note that batch major is the default
+        self.delta_t = hparams.delta_t
+
+        super().__init__(cell, return_sequences=True,
+                         return_state=False, **kwargs) # Note that batch major is the default
 
     def call(self, signal):
         incs = signal[:, 1:] - signal[:, :-1]
-        return super(PsiCMPSCell, self).call(incs)
+        time = tf.range(incs.shape[1], dtype=tf.float32) * self.delta_t
+        batch_size = incs.shape[0]
+        time = tf.expand_dims(time, axis=0)
+        time = tf.tile(time, [batch_size, 1])
+        # time = tf.stack(batch_size * [time]) # Doesn't work when batch_size a tensor
+        inputs = tf.stack([incs, time], axis=2)
+        return super().call(inputs)
 
 
