@@ -66,7 +66,7 @@ class TestSchrodingerRNN(tf.test.TestCase):
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             output_eval = output.eval()
-            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
+            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration - 1, 2))
 
 if __name__ == '__main__':
       tf.test.main()

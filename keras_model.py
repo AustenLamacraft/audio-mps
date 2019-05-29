@@ -94,19 +94,19 @@ class PsiCMPSCell(CMPSCell):
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
         return state
 
-    def call(self, input, psi):
+    def call(self, inputs, psi):
         psi = psi[0] # Keras RNN expect the states in a list, even if it's a single state tensor.
-        psi = self._update_ancilla_psi(psi, input)
-        loss = self._inc_loss_psi(psi, input)
+        psi = self._update_ancilla(psi, inputs)
+        self._loss(psi, inputs)
         psi = normalize_psi(psi, axis=1)
-        return loss, [psi]
+        return inputs, [psi]
 
-    def _inc_loss_psi(self, psi, signal_time):
+    def _loss(self, psi, signal_time):
         signal = signal_time[:, 0]
-        t = signal_time[:, 0]
-        return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
+        t = signal_time[:, 1]
+        self.add_loss(tf.log(1. + self._expectation(psi, t) * signal / self.A))
 
-    def _update_ancilla_psi(self, psi, signal_time):
+    def _update_ancilla(self, psi, signal_time):
         with tf.variable_scope("update_ancilla"):
             signal = signal_time[:, 0]
             t = signal_time[:, 1]
@@ -157,4 +157,4 @@ class SchrodingerRNN(tf.keras.layers.RNN):
         inputs = tf.stack([incs, time], axis=2)
         return super().call(inputs)
 
-
+        # TODO Add training flag and loss
