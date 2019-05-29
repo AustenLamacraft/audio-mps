@@ -23,6 +23,19 @@ def get_audio(datadir, dataset, hps):
         data = sine_wave_random_delay
         datalog = f"_freq{freq}_dect{decay_time}_delt{delay_time}"
 
+    elif dataset == 'fixed_damped sine':
+
+        input_length = FLAGS.sample_duration
+        freq = 600.
+        decay_time = 0.003
+
+        input_range = tf.expand_dims(tf.range(input_length, dtype=np.float32), axis=0)
+        times = input_range * hps.delta_t
+        sine_wave_fixed = tf.sin(2 * np.pi * freq * times) * tf.exp(- times / decay_time)
+
+        data = sine_wave_fixed
+        datalog = f"_freq{freq}_dect{decay_time}_delt{delay_time}"
+
     else:
 
         # LOAD DATA
