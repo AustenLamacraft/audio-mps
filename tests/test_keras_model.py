@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from keras_model import CMPSCell, PsiCMPSCell, StochasticSchrodinger
+from keras_model import CMPSCell, PsiCMPSCell, StochasticSchrodinger, SchrodingerRNN
 from data import get_audio
 
 from tensorflow.contrib.training import HParams
@@ -49,11 +49,20 @@ class TestPsiCMPSCell(tf.test.TestCase):
         psi_0 = [cell.get_initial_state(batch_size=hps.minibatch_size)]
         cell.build(0)
 
-
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
             _, updated_psi = cell.call(input, psi_0)
             self.assertAllClose(updated_psi, psi_0)
+
+    def testRegularizerLosses(self):
+        cell = PsiCMPSCell(hps)
+        cell.build(0)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            Rx_reg, Ry_reg, freqs_reg = cell.losses
+            # This doesn't work for R because we have removed diagonal elements
+            self.assertAllClose(freqs_reg, hps.h_reg * tf.reduce_sum(tf.square(cell.freqs)))
 
 
 class TestStochasticSchrodinger(tf.test.TestCase):
@@ -65,8 +74,20 @@ class TestStochasticSchrodinger(tf.test.TestCase):
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            output_eval = output.eval() # Other losses are regularizers
+            output_eval = output.eval()
             self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration))
+
+class TestSchrodingerRNN(tf.test.TestCase):
+
+    def testCallGivesCorrectShape(self):
+        model = SchrodingerRNN(hps)
+        signal = np.random.rand(hps.minibatch_size, FLAGS.sample_duration).astype(dtype=np.float32)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            output_eval = model(signal).eval()
+            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
+
 
 if __name__ == '__main__':
       tf.test.main()
