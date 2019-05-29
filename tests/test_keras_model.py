@@ -61,12 +61,12 @@ class TestSchrodingerRNN(tf.test.TestCase):
     def testOutputCorrectShape(self):
         rnn = SchrodingerRNN(hps)
         signal = np.random.rand(hps.minibatch_size, FLAGS.sample_duration).astype(dtype=np.float32)
-        output = rnn(signal)
+        rnn(signal)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            output_eval = output.eval()
-            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration - 1, 2))
+            losses = rnn.losses[3].eval() # Other losses are regularizers
+            self.assertEqual(losses.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
 
 if __name__ == '__main__':
       tf.test.main()
