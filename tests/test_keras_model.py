@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from keras_model import CMPSCell, PsiCMPSCell, SchrodingerRNN
+from keras_model import CMPSCell, PsiCMPSCell, StochasticSchrodinger
 from data import get_audio
 
 from tensorflow.contrib.training import HParams
@@ -56,17 +56,17 @@ class TestPsiCMPSCell(tf.test.TestCase):
             self.assertAllClose(updated_psi, psi_0)
 
 
-class TestSchrodingerRNN(tf.test.TestCase):
+class TestStochasticSchrodinger(tf.test.TestCase):
 
     def testOutputCorrectShape(self):
-        rnn = SchrodingerRNN(hps)
+        rnn = StochasticSchrodinger(hps)
         signal = np.random.rand(hps.minibatch_size, FLAGS.sample_duration).astype(dtype=np.float32)
-        rnn(signal)
+        output = rnn(signal)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            losses = rnn.losses[3].eval() # Other losses are regularizers
-            self.assertEqual(losses.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
+            output_eval = output.eval() # Other losses are regularizers
+            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration))
 
 if __name__ == '__main__':
       tf.test.main()

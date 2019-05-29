@@ -22,8 +22,6 @@ class CMPSCell(tf.keras.layers.Layer):
         self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
 
         self.sigma = hparams.sigma
-        # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
-        # self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
 
         self.freqs_in = freqs_in
         self.R_in = R_in
@@ -94,17 +92,28 @@ class PsiCMPSCell(CMPSCell):
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
         return state
 
-    def call(self, inputs, psi):
+    def call(self, inputs, psi, training=True):
         psi = psi[0] # Keras RNN expect the states in a list, even if it's a single state tensor.
+        if training:
+            # inputs are increments and time, output is loss
+            output = self._loss(psi, inputs)
+        else:
+            # inputs are noise and time, output is increment
+            output = self._sample(psi, inputs)
         psi = self._update_ancilla(psi, inputs)
-        loss = self._loss(psi, inputs)
         psi = normalize_psi(psi, axis=1)
-        return loss, [psi]
+        return output, [psi]
 
     def _loss(self, psi, signal_time):
         signal = signal_time[:, 0]
         t = signal_time[:, 1]
-        return tf.log(1. + self._expectation(psi, t) * signal / self.A)
+        exp = self._expectation(psi, t)
+        return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t
+
+    def _sample(self, psi, noise_time):
+        noise = noise_time[:, 0]
+        t = noise_time[:, 1]
+        return self._expectation(psi, t) * self.delta_t + noise
 
     def _update_ancilla(self, psi, signal_time):
         with tf.variable_scope("update_ancilla"):
@@ -139,24 +148,45 @@ class PsiCMPSCell(CMPSCell):
             return 2 * tf.real(exp)  # Conveniently returns a float
 
 
-class SchrodingerRNN(tf.keras.layers.RNN):
+class StochasticSchrodinger(tf.keras.layers.RNN):
     def __init__(self, hparams, **kwargs):
         cell = PsiCMPSCell(hparams)
         self.delta_t = hparams.delta_t
 
         super().__init__(cell, return_sequences=True,
-                         return_state=False, **kwargs) # Note that batch major is the default
+                         return_state=False, **kwargs)  # Note that batch major is the default
 
-    def call(self, signal):
-        incs = signal[:, 1:] - signal[:, :-1]
-        time = tf.range(incs.shape[1], dtype=tf.float32) * self.delta_t
-        batch_size = incs.shape[0]
+    def call(self, inputs, training=True):
+        """
+        Takes increments if training, noise if sampling.
+        Returns loss if training, sampled increments if sampling
+        """
+        # incs = signal[:, 1:] - signal[:, :-1]
+        time = tf.range(inputs.shape[1], dtype=tf.float32) * self.delta_t
+        batch_size = inputs.shape[0]
         time = tf.expand_dims(time, axis=0)
         time = tf.tile(time, [batch_size, 1])
         # time = tf.stack(batch_size * [time]) # Doesn't work when batch_size a tensor
-        inputs = tf.stack([incs, time], axis=2)
-        loss_series = super().call(inputs)
-        self.add_loss(loss_series)
+        rnn_inputs = tf.stack([inputs, time], axis=2)
+        output = super().call(rnn_inputs, training=training)
+        return output
 
 
-        # TODO Add training flag and loss
+class SchrodingerRNN(tf.keras.Model):
+
+    def __init__(self, hparams):
+        super().__init__(hparams)
+        self.sigma = hparams.sigma
+        self.delta_t = hparams.delta_t
+        self.sse = StochasticSchrodinger(hparams)
+
+    def call(self, signal):
+        incs = signal[:, 1:] - signal[:, :-1]
+        return self.sse(incs, training=True)
+
+    def sample(self, num_samples, sample_duration):
+        noise = tf.random_normal([num_samples, sample_duration],
+                                 stddev=self.sigma * np.sqrt(self.delta_t))
+
+        sampled_incs = self.sse(noise, training=False)
+        return tf.math.cumsum(sampled_incs, axis=1)
