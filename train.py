@@ -4,6 +4,7 @@ import tfplot
 
 from tensorflow.contrib.training import HParams
 from model import RhoCMPS, PsiCMPS
+from keras_model import SchrodingerRNN
 from data import get_audio
 from utils import waveform_plot
 
@@ -47,17 +48,20 @@ def main(argv):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
     with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-        if FLAGS.mps_model == 'rho_mps':
-            model = RhoCMPS(hparams=hparams, data_iterator=data)
-        else:
-            model = PsiCMPS(hparams=hparams, data_iterator=data)
+        # if FLAGS.mps_model == 'rho_mps':
+        #     model = RhoCMPS(hparams=hparams, data_iterator=data)
+        # else:
+        #     model = PsiCMPS(hparams=hparams, data_iterator=data)
+        model = SchrodingerRNN(hparams=hparams)
 
-        h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
-        r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
+        # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
+        # r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
     with tf.variable_scope("total_loss"):
-        total_loss = model.loss + hparams.h_reg * h_l2sqnorm \
-                                    + hparams.r_reg * r_l2sqnorm
+        model_loss = tf.reduce_sum(model(data), axis=1)
+        batch_mean = tf.reduce_mean(model_loss)
+        total_loss = batch_mean + model.sse.losses
+
 
     with tf.variable_scope("summaries"):
         tf.summary.scalar("A", tf.cast(model.A, dtype=tf.float32))

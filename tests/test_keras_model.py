@@ -77,16 +77,15 @@ class TestStochasticSchrodinger(tf.test.TestCase):
             output_eval = output.eval()
             self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration))
 
+
 class TestSchrodingerRNN(tf.test.TestCase):
 
     def testCallGivesCorrectShape(self):
         model = SchrodingerRNN(hps)
         signal = np.random.rand(hps.minibatch_size, FLAGS.sample_duration).astype(dtype=np.float32)
-
-        with self.cached_session() as sess:
-            sess.run(tf.global_variables_initializer())
-            output_eval = model(signal).eval()
-            self.assertEqual(output_eval.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
+        # Note that keras handles sessions, initialization, and so on...
+        output = model(signal)
+        self.assertEqual(output.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
 
 
 if __name__ == '__main__':
