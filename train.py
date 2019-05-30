@@ -21,7 +21,7 @@ tf.flags.DEFINE_enum('mps_model', 'psi_mps',
 
 # Training flags
 tf.flags.DEFINE_enum('dataset', 'damped_sine',
-                     ['damped_sine', 'guitar', 'organ', 'nsynth'],
+                     ['damped_sine', 'fixed_damped_sine', 'guitar', 'organ', 'nsynth'],
                      'Dataset. Must be one of "damped_sine", "guitar", "organ", or "nsynth".')
 
 tf.flags.DEFINE_integer("sample_duration", 2**16, "Duration of samples (as integer).")
@@ -40,7 +40,7 @@ def main(argv):
     #                   initial_rank=None, A=100., learning_rate=0.001)
 
 
-    hparams = HParams(minibatch_size=8, bond_dim=5, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
+    hparams = HParams(minibatch_size=8, bond_dim=13, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)

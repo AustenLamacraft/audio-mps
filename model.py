@@ -190,13 +190,14 @@ class RhoCMPS(CMPS):
         return rho, sample, t
 
     def _inc_loss_rho(self, rho, signal, t):
-        # return - tf.log(1. + self._expectation(rho, t) * signal / self.A)
-        return - self._expectation(rho, t) * signal + 0.5 * self.A * (self._expectation(rho, t))**2 * self.dt
+        inc_loss = (- self.A * self._expectation(rho, t) * signal +\
+               0.5 * (self.A**2) * (self._expectation(rho, t)**2) * self.dt) / self.sigma**2
+        return inc_loss
 
     def _update_ancilla_rho(self, rho, signal, t):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal / self.A, dtype=tf.complex64)
+            signal = tf.cast(signal, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             batch_size = rho.shape[0]
             phases = tf.exp(1j * self.freqsc * t)
@@ -341,9 +342,9 @@ class PsiCMPS(CMPS):
         return psi, sample, t
 
     def _inc_loss_psi(self, psi, signal, t):
-        #TODO delete when finished
-        # return - tf.log(1. + self._expectation(psi, t) * signal / self.A)
-        return - self._expectation(psi, t) * signal + 0.5 * self.A * (self._expectation(psi, t)**2) * self.dt
+        inc_loss = (- self.A * self._expectation(psi, t) * signal +\
+               0.5 * (self.A**2) * (self._expectation(psi, t)**2) * self.dt) / self.sigma**2
+        return inc_loss
 
     def _norm_square_psi(self, psi):
         exp = tf.einsum('ab,ab->a', tf.conj(psi), psi)
@@ -352,7 +353,7 @@ class PsiCMPS(CMPS):
     def _update_ancilla_psi(self, psi, signal, t):
         # Note we do not normalize the state anymore in this method
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal / self.A, dtype=tf.complex64)
+            signal = tf.cast(signal, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             phases = tf.exp(1j * self.freqsc * t)
             Upsi = psi * tf.conj(phases)
