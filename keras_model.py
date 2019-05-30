@@ -119,7 +119,7 @@ class PsiCMPSCell(CMPSCell):
         with tf.variable_scope("update_ancilla"):
             signal = signal_time[:, 0]
             t = signal_time[:, 1]
-            signal = tf.cast(signal / self.A, dtype=tf.complex64)
+            signal = tf.cast(signal, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             t = tf.expand_dims(t, axis=1)
             freqsc = tf.expand_dims(self.freqsc, axis=0)
