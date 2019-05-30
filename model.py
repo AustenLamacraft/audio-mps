@@ -18,6 +18,7 @@ class CMPS:
         self.A = hparams.A
         self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
 
+        # TODO leave a warning message to include sigma in the loss, if we learn it
         self.sigma = hparams.sigma
         # self.sigma = tf.get_variable("sigma", dtype=tf.float32, initializer=hparams.sigma)
         # self.sigma = tf.cast(self.sigma, dtype=tf.complex64)
@@ -190,8 +191,8 @@ class RhoCMPS(CMPS):
         return rho, sample, t
 
     def _inc_loss_rho(self, rho, signal, t):
-        inc_loss = (- self.A * self._expectation(rho, t) * signal +\
-               0.5 * (self.A**2) * (self._expectation(rho, t)**2) * self.dt) / self.sigma**2
+        inc_loss = - self.A * self._expectation(rho, t) * signal +\
+               0.5 * (self.A**2) * (self._expectation(rho, t)**2) * self.dt
         return inc_loss
 
     def _update_ancilla_rho(self, rho, signal, t):
@@ -342,8 +343,8 @@ class PsiCMPS(CMPS):
         return psi, sample, t
 
     def _inc_loss_psi(self, psi, signal, t):
-        inc_loss = (- self.A * self._expectation(psi, t) * signal +\
-               0.5 * (self.A**2) * (self._expectation(psi, t)**2) * self.dt) / self.sigma**2
+        inc_loss = - self.A * self._expectation(psi, t) * signal +\
+               0.5 * (self.A**2) * (self._expectation(psi, t)**2) * self.dt
         return inc_loss
 
     def _norm_square_psi(self, psi):

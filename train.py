@@ -40,7 +40,7 @@ def main(argv):
     #                   initial_rank=None, A=100., learning_rate=0.001)
 
 
-    hparams = HParams(minibatch_size=8, bond_dim=13, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
+    hparams = HParams(minibatch_size=8, bond_dim=150, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
