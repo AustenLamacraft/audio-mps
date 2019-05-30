@@ -58,15 +58,15 @@ class RhoCMPS(CMPS):
         Evolves the density matrix
     """
     def __init__(self, hparams, W_in=None, *args, **kwargs):
-        with tf.variable_scope("RhoCMPS"):
-            super(RhoCMPS, self).__init__(hparams, *args, **kwargs)
 
-            if hparams.initial_rank is not None:
-                self.rank_rho_0 = hparams.initial_rank
-            else:
-                self.rank_rho_0 = hparams.bond_dim
+        super(RhoCMPS, self).__init__(hparams, *args, **kwargs)
 
-            self.rho_0 = self._rho_init(W_in)
+        if hparams.initial_rank is not None:
+            self.rank_rho_0 = hparams.initial_rank
+        else:
+            self.rank_rho_0 = hparams.bond_dim
+
+        self.rho_0 = self._rho_init(W_in)
 
         if self.data_iterator is not None:
             self.loss, self.rms_R_plus_Rdag = self._build_loss_rho()
@@ -232,18 +232,18 @@ class PsiCMPS(CMPS):
     """
 
     def __init__(self, hparams, psi_in=None, *args, **kwargs):
-        with tf.variable_scope("PsiCMPS"):
-            super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
 
-            if psi_in is not None:
-                psi_x = tf.get_variable("psi_x", dtype=tf.float32, initializer=psi_x_in)
-                psi_y = tf.get_variable("psi_y", dtype=tf.float32, initializer=psi_y_in)
-            else:
-                psi_x = tf.get_variable("psi_x", shape=[self.bond_d], dtype=tf.float32, initializer=None)
-                psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+        super(PsiCMPS, self).__init__(hparams, *args, **kwargs)
 
-            self.psi_0 = tf.complex(psi_x, psi_y)
-            self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
+        if psi_in is not None:
+            psi_x = tf.get_variable("psi_x", dtype=tf.float32, initializer=psi_x_in)
+            psi_y = tf.get_variable("psi_y", dtype=tf.float32, initializer=psi_y_in)
+        else:
+            psi_x = tf.get_variable("psi_x", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+            psi_y = tf.get_variable("psi_y", shape=[self.bond_d], dtype=tf.float32, initializer=None)
+
+        self.psi_0 = tf.complex(psi_x, psi_y)
+        self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
 
         if self.data_iterator is not None:
             # self.loss = self._build_loss_psi(self.data_iterator)
