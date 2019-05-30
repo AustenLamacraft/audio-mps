@@ -170,10 +170,6 @@ class RhoCMPS(CMPS):
 
     def _rho_and_loss_update(self, rho_loss_t, signal):
         rho, loss, t, R_plus_Rdag = rho_loss_t
-        #TODO delete when finished
-        # rho = self._update_ancilla_rho(rho, signal, t)
-        # loss += self._inc_loss_rho(rho, signal, t)
-        # rho = self._normalize_rho(rho)
         loss += self._inc_loss_rho(rho, signal, t)
         R_plus_Rdag += tf.square(self._expectation(rho, t))
         rho = self._update_ancilla_rho(rho, signal, t)
@@ -322,10 +318,6 @@ class PsiCMPS(CMPS):
 
     def _psi_and_loss_update(self, psi_loss_t, signal):
         psi, loss, t, R_plus_Rdag = psi_loss_t
-        #TODO delete this once all is finished
-        # psi = self._update_ancilla_psi(psi, signal, t)
-        # loss += self._inc_loss_psi(psi, signal, t)
-        # psi = self._normalize_psi(psi, axis=1)
         loss += self._inc_loss_psi(psi, signal, t)
         R_plus_Rdag += tf.square(self._expectation(psi, t))
         psi = self._update_ancilla_psi(psi, signal, t)
