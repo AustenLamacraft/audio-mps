@@ -40,7 +40,7 @@ def main(argv):
     #                   initial_rank=None, A=100., learning_rate=0.001)
 
 
-    hparams = HParams(minibatch_size=8, bond_dim=150, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
+    hparams = HParams(minibatch_size=8, bond_dim=5, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
@@ -76,9 +76,9 @@ def main(argv):
         tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
         tf.summary.histogram("frequencies", model.freqs / (2 * np.pi))
 
-        #R summary
-        rms_R = tf.sqrt(tf.reduce_mean(tf.reshape(tf.real(model.R*tf.conj(model.R)),[hparams.bond_dim**2])))
-        tf.summary.scalar("rms_R", tf.reshape(rms_R, []))
+        #rms(R+Rdag) summary
+        rms_R_plus_Rdag = model.rms_R_plus_Rdag
+        tf.summary.scalar("rms_R_plus_Rdag", tf.reshape(rms_R_plus_Rdag, []))
 
 
         # if FLAGS.visualize:

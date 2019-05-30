@@ -67,7 +67,7 @@ class RhoCMPS(CMPS):
         self.rho_0 = self._rho_init(W_in)
 
         if self.data_iterator is not None:
-            self.loss = self._build_loss_rho()
+            self.loss, self.rms_R_plus_Rdag = self._build_loss_rho()
 
     # ====================
     # Rho methods-PUBLIC
@@ -155,9 +155,9 @@ class RhoCMPS(CMPS):
         # We switch to increments
         incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
         incs = tf.transpose(incs, [1, 0])  # foldl goes along the 1st dimension
-        _, loss, _ = tf.foldl(self._rho_and_loss_update, incs,
-                           initializer=(rho_0, loss, 0.), name="loss_fold")
-        return tf.reduce_mean(loss)
+        _, loss, T, R_plus_Rdag = tf.foldl(self._rho_and_loss_update, incs,
+                           initializer=(rho_0, loss, 0., batch_zeros), name="loss_fold")
+        return tf.reduce_mean(loss), tf.sqrt(tf.reduce_mean(R_plus_Rdag)/T)
 
     def _rho_update(self, rho_loss_t, signal):
         # TODO change the name of the first argument
@@ -168,16 +168,17 @@ class RhoCMPS(CMPS):
         return rho, loss, t
 
     def _rho_and_loss_update(self, rho_loss_t, signal):
-        rho, loss, t = rho_loss_t
+        rho, loss, t, R_plus_Rdag = rho_loss_t
         #TODO delete when finished
         # rho = self._update_ancilla_rho(rho, signal, t)
         # loss += self._inc_loss_rho(rho, signal, t)
         # rho = self._normalize_rho(rho)
         loss += self._inc_loss_rho(rho, signal, t)
+        R_plus_Rdag += tf.square(self._expectation(rho, t))
         rho = self._update_ancilla_rho(rho, signal, t)
         rho = self._normalize_rho(rho)
         t += self.dt
-        return rho, loss, t
+        return rho, loss, t, R_plus_Rdag
 
     def _rho_and_sample_update(self, rho_sample_t, noise):
         rho, sample, t = rho_sample_t
@@ -245,7 +246,8 @@ class PsiCMPS(CMPS):
         self.psi_0 = self._normalize_psi(self.psi_0) # No need of axis=1 because this is not a batch of psis
 
         if self.data_iterator is not None:
-            self.loss = self._build_loss_psi(self.data_iterator)
+            # self.loss = self._build_loss_psi(self.data_iterator)
+            self.loss, self.rms_R_plus_Rdag = self._build_loss_psi()
 
     # ====================
     # Psi methods-PUBLIC
@@ -295,7 +297,7 @@ class PsiCMPS(CMPS):
     # Psi methods-PRIVATE
     # =====================
 
-    def _build_loss_psi(self, data):
+    def _build_loss_psi(self):
         batch_size = self.data_iterator.shape[0]
         batch_zeros = tf.zeros([batch_size])
         psi_0 = tf.stack(batch_size * [self.psi_0])
@@ -303,9 +305,11 @@ class PsiCMPS(CMPS):
         # We switch to increments
         incs = self.data_iterator[:, 1:] - self.data_iterator[:, :-1]
         incs = tf.transpose(incs, [1, 0])  # foldl goes along the 1st dimension
-        _, loss, _ = tf.foldl(self._psi_and_loss_update, incs,
-                           initializer=(psi_0, loss, 0.), name="loss_fold")
-        return tf.reduce_mean(loss)
+        # _, loss, _ = tf.foldl(self._psi_and_loss_update, incs,
+        #                    initializer=(psi_0, loss, 0.), name="loss_fold")
+        _, loss, T, R_plus_Rdag = tf.foldl(self._psi_and_loss_update, incs,
+                           initializer=(psi_0, loss, 0., batch_zeros), name="loss_fold")
+        return tf.reduce_mean(loss), tf.sqrt(tf.reduce_mean(R_plus_Rdag)/T)
 
     def _psi_update(self, psi_loss_t, signal):
         psi, loss, t = psi_loss_t
@@ -315,16 +319,17 @@ class PsiCMPS(CMPS):
         return psi, loss, t
 
     def _psi_and_loss_update(self, psi_loss_t, signal):
-        psi, loss, t = psi_loss_t
+        psi, loss, t, R_plus_Rdag = psi_loss_t
         #TODO delete this once all is finished
         # psi = self._update_ancilla_psi(psi, signal, t)
         # loss += self._inc_loss_psi(psi, signal, t)
         # psi = self._normalize_psi(psi, axis=1)
         loss += self._inc_loss_psi(psi, signal, t)
+        R_plus_Rdag += tf.square(self._expectation(psi, t))
         psi = self._update_ancilla_psi(psi, signal, t)
         psi = self._normalize_psi(psi, axis=1)
         t += self.dt
-        return psi, loss, t
+        return psi, loss, t, R_plus_Rdag
 
     def _psi_and_sample_update(self, psi_sample_t, noise):
         psi, sample, t = psi_sample_t
