@@ -113,7 +113,7 @@ class PsiCMPSCell(CMPSCell):
     def _sample(self, psi, noise_time):
         noise = noise_time[:, 0]
         t = noise_time[:, 1]
-        return self._expectation(psi, t) * self.delta_t + noise
+        return self.A * self._expectation(psi, t) * self.delta_t + noise
 
     def _update_ancilla(self, psi, signal_time):
         with tf.variable_scope("update_ancilla"):
@@ -151,7 +151,7 @@ class PsiCMPSCell(CMPSCell):
 class StochasticSchrodinger(tf.keras.layers.RNN):
     def __init__(self, hparams, **kwargs):
         cell = PsiCMPSCell(hparams)
-        self.delta_t = hparams.delta_t
+        self.delta_t = tf.constant(hparams.delta_t, tf.float32)
 
         super().__init__(cell, return_sequences=True,
                          return_state=False, **kwargs)  # Note that batch major is the default
@@ -162,7 +162,7 @@ class StochasticSchrodinger(tf.keras.layers.RNN):
         Returns loss if training, sampled increments if sampling
         """
         # incs = signal[:, 1:] - signal[:, :-1]
-        time = tf.range(inputs.shape[1], dtype=tf.float32) * self.delta_t
+        time = tf.cast(tf.range(inputs.shape[1], dtype=tf.int32), dtype=tf.float32) * self.delta_t
         batch_size = inputs.shape[0]
         time = tf.expand_dims(time, axis=0)
         time = tf.tile(time, [batch_size, 1])
