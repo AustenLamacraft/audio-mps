@@ -86,6 +86,7 @@ class TestSchrodingerRNN(tf.test.TestCase):
         # Note that keras handles sessions, initialization, and so on...
         output = model(signal)
         self.assertEqual(output.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
+        model.summary()
 
 
 if __name__ == '__main__':

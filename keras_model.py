@@ -18,9 +18,7 @@ class CMPSCell(tf.keras.layers.Layer):
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
 
-        self.A = hparams.A
-        self.A = tf.get_variable("A", dtype=tf.float32, initializer=hparams.A)
-
+        self.A_in = hparams.A
         self.sigma = hparams.sigma
 
         self.freqs_in = freqs_in
@@ -31,6 +29,9 @@ class CMPSCell(tf.keras.layers.Layer):
         # ======================================================
         # Training variables (cannot be complex)
         # ======================================================
+
+        A_init = Constant(self.A_in)
+        self.A = self.add_variable("A", dtype=tf.float32, shape=[1], initializer=A_init)
 
         if self.R_in is not None:
             Rreal_init = Constant(self.R_in.real)
@@ -59,7 +60,6 @@ class CMPSCell(tf.keras.layers.Layer):
                                        initializer=freqs_init,
                                        regularizer=L1L2(l2=self.h_reg))
 
-        self.freqsc = tf.cast(self.freqs, dtype=tf.complex64)
         self.built = True
 
 
@@ -108,7 +108,7 @@ class PsiCMPSCell(CMPSCell):
         signal = signal_time[:, 0]
         t = signal_time[:, 1]
         exp = self._expectation(psi, t)
-        return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t
+        return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t / 2.
 
     def _sample(self, psi, noise_time):
         noise = noise_time[:, 0]
@@ -117,18 +117,17 @@ class PsiCMPSCell(CMPSCell):
 
     def _update_ancilla(self, psi, signal_time):
         with tf.variable_scope("update_ancilla"):
+            signal_time = tf.cast(signal_time, dtype=tf.complex64)
+            freqsc = tf.cast(self.freqs, dtype=tf.complex64)
             signal = signal_time[:, 0]
             t = signal_time[:, 1]
-            signal = tf.cast(signal, dtype=tf.complex64)
-            t = tf.cast(t, dtype=tf.complex64)
-            t = tf.expand_dims(t, axis=1)
-            freqsc = tf.expand_dims(self.freqsc, axis=0)
-            phases = tf.exp(1j * freqsc * t)
+            phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
 
             Rdag = tf.linalg.adjoint(self.R)
             RUpsi = tf.einsum('bc,ac->ab', self.R, Upsi)
             RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
+            # I guess we could do this in one go and einsum would figure out the correct way...
 
             delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
             delta_Upsi += tf.expand_dims(signal, axis=1) * RUpsi
@@ -140,9 +139,8 @@ class PsiCMPSCell(CMPSCell):
     def _expectation(self, psi, t):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
-            t = tf.expand_dims(t, axis=1)
-            freqsc = tf.expand_dims(self.freqsc, axis=0)
-            phases = tf.exp(1j * freqsc * t)
+            freqsc = tf.cast(self.freqs, dtype=tf.complex64)
+            phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
             exp = tf.einsum('ab,bc,ac->a', tf.conj(Upsi), self.R, Upsi)
             return 2 * tf.real(exp)  # Conveniently returns a float
@@ -161,7 +159,6 @@ class StochasticSchrodinger(tf.keras.layers.RNN):
         Takes increments if training, noise if sampling.
         Returns loss if training, sampled increments if sampling
         """
-        # incs = signal[:, 1:] - signal[:, :-1]
         time = tf.cast(tf.range(inputs.shape[1], dtype=tf.int32), dtype=tf.float32) * self.delta_t
         batch_size = inputs.shape[0]
         time = tf.expand_dims(time, axis=0)
