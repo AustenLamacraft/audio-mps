@@ -17,7 +17,7 @@ FLAGS = tf.flags.FLAGS
 # Model flags
 tf.flags.DEFINE_enum('mps_model', 'psi_mps',
                      ['rho_mps', 'psi_mps'],
-                     'MPS mdoel. Must be one of "rho_mps" or "psi_mps".')
+                     'MPS model. Must be one of "rho_mps" or "psi_mps".')
 
 # Training flags
 tf.flags.DEFINE_enum('dataset', 'damped_sine',
