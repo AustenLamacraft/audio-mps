@@ -37,11 +37,11 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 def main(argv):
     # hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.000001,
     #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
-    #                   initial_rank=None, A=100., learning_rate=0.001)
+    #                   initial_rank=None, A=1., learning_rate=0.001)
 
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
                       h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
-                      initial_rank=None, A=100., learning_rate=0.001)
+                      initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -57,11 +57,13 @@ def main(argv):
     # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
     # r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
-    with tf.variable_scope("total_loss"):
-        model_loss = tf.reduce_sum(model(data), axis=1)
-        batch_mean = tf.reduce_mean(model_loss)
-        reg_loss = tf.reduce_sum(model.sse.losses)
-        total_loss = batch_mean + reg_loss
+
+    model_loss = tf.reduce_sum(model(data), axis=1)
+    batch_mean = tf.reduce_mean(model_loss)
+    tf.losses.add_loss(batch_mean)
+
+    reg_loss = tf.reduce_sum(model.sse.losses)
+    total_loss = batch_mean + reg_loss
 
 
     with tf.variable_scope("summaries"):

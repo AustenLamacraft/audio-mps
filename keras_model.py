@@ -92,35 +92,32 @@ class PsiCMPSCell(CMPSCell):
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
         return state
 
-    def call(self, inputs, psi, training=True):
+    def call(self, signal_time, psi):
         psi = psi[0] # Keras RNN expect the states in a list, even if it's a single state tensor.
-        if training:
-            # inputs are increments and time, output is loss
-            output = self._loss(psi, inputs)
-        else:
-            # inputs are noise and time, output is increment
-            output = self._sample(psi, inputs)
-        psi = self._update_ancilla(psi, inputs)
+        # Inputs are values and times, output is prediction for next value
+        signal = signal_time[:, 0]
+        t = signal_time[:, 1]
+        output = signal + self.A * self._expectation(psi, t) * self.delta_t
+        psi = self._update_ancilla(psi, signal, t)
         psi = normalize_psi(psi, axis=1)
         return output, [psi]
 
-    def _loss(self, psi, signal_time):
-        signal = signal_time[:, 0]
-        t = signal_time[:, 1]
-        exp = self._expectation(psi, t)
-        return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t / 2.
+    # def _loss(self, psi, signal_time):
+    #     signal = signal_time[:, 0]
+    #     t = signal_time[:, 1]
+    #     exp = self._expectation(psi, t)
+    #     return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t / 2.
 
     def _sample(self, psi, noise_time):
         noise = noise_time[:, 0]
         t = noise_time[:, 1]
         return self.A * self._expectation(psi, t) * self.delta_t + noise
 
-    def _update_ancilla(self, psi, signal_time):
+    def _update_ancilla(self, psi, signal, t):
         with tf.variable_scope("update_ancilla"):
-            signal_time = tf.cast(signal_time, dtype=tf.complex64)
+            signal = tf.cast(signal, dtype=tf.complex64)
+            t = tf.cast(t, dtype=tf.complex64)
             freqsc = tf.cast(self.freqs, dtype=tf.complex64)
-            signal = signal_time[:, 0]
-            t = signal_time[:, 1]
             phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
 
@@ -156,8 +153,7 @@ class StochasticSchrodinger(tf.keras.layers.RNN):
 
     def call(self, inputs, training=True):
         """
-        Takes increments if training, noise if sampling.
-        Returns loss if training, sampled increments if sampling
+        Takes signal and returns predictions for next value
         """
         time = tf.cast(tf.range(inputs.shape[1], dtype=tf.int32), dtype=tf.float32) * self.delta_t
         batch_size = inputs.shape[0]
@@ -165,7 +161,7 @@ class StochasticSchrodinger(tf.keras.layers.RNN):
         time = tf.tile(time, [batch_size, 1])
         # time = tf.stack(batch_size * [time]) # Doesn't work when batch_size a tensor
         rnn_inputs = tf.stack([inputs, time], axis=2)
-        output = super().call(rnn_inputs, training=training)
+        output = super().call(rnn_inputs)
         return output
 
 
@@ -178,8 +174,10 @@ class SchrodingerRNN(tf.keras.Model):
         self.sse = StochasticSchrodinger(hparams)
 
     def call(self, signal):
-        incs = signal[:, 1:] - signal[:, :-1]
-        return self.sse(incs, training=True)
+        predictions = self.sse(signal, training=True)
+        # Must match predictions with the right input
+        predictions = tf.concat([signal[:, :1], predictions[:, :-1]], axis=1)
+        return predictions
 
     def sample(self, num_samples, sample_duration):
         noise = tf.random_normal([num_samples, sample_duration],

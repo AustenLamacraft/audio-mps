@@ -85,8 +85,14 @@ class TestSchrodingerRNN(tf.test.TestCase):
         signal = np.random.rand(hps.minibatch_size, FLAGS.sample_duration).astype(dtype=np.float32)
         # Note that keras handles sessions, initialization, and so on...
         output = model(signal)
-        self.assertEqual(output.shape, (hps.minibatch_size, FLAGS.sample_duration - 1))
-        model.summary()
+        self.assertEqual(output.shape, (hps.minibatch_size, FLAGS.sample_duration))
+
+    def testSampleGivesCorrectShape(self):
+        num_samples = 4
+        model = SchrodingerRNN(hps)
+        # Note that keras handles sessions, initialization, and so on...
+        output = model.sample(num_samples=num_samples, sample_duration=FLAGS.sample_duration)
+        self.assertEqual(output.shape, (num_samples, FLAGS.sample_duration))
 
 
 if __name__ == '__main__':
