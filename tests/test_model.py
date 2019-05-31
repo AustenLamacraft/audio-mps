@@ -198,4 +198,5 @@ class TestPsiCMPS(tf.test.TestCase):
             loss_psi = model_psi.loss
             loss_rho = model_rho.loss
             #TODO should we worry about not passing the test if rtol,atol=e-6?
+            # I would say no because we are using single precision.
             self.assertAllClose(loss_rho, loss_psi, rtol=1e-05, atol=1e-05)
