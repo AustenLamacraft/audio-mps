@@ -65,6 +65,7 @@ def main(argv):
     reg_loss = tf.reduce_sum(model.sse.losses)
     total_loss = batch_mean + reg_loss
 
+    logdir = f'{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}'
 
     with tf.variable_scope("summaries"):
         model_vars = model.trainable_weights
@@ -82,24 +83,32 @@ def main(argv):
         tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
         tf.summary.histogram("frequencies", model_vars[3] / (2 * np.pi))
 
-        if FLAGS.num_samples != 0:
-            samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
-            tf.summary.audio("samples", samples, sample_rate=FLAGS.sample_rate, max_outputs=5)
+        # if FLAGS.num_samples != 0:
+            # samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
+            # tf.summary.audio("samples", samples, sample_rate=FLAGS.sample_rate, max_outputs=5)
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
             data_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
             tf.summary.image("data_waveform", data_waveform_op)
-            sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
-            tf.summary.image("sample_waveform", sample_waveform_op)
+            # sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
+            # tf.summary.image("sample_waveform", sample_waveform_op)
 
-    step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-    train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)
+    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=hparams.learning_rate),
+                  loss='mse')
+
+    tb_call = tf.keras.callbacks.TensorBoard(log_dir=logdir, write_images=True,
+                                             batch_size=hparams.minibatch_size, update_freq=100)
+
+    model.fit(x=data, y=data, batch_size=hparams.minibatch_size, steps_per_epoch=100, callbacks=[tb_call])
+
+    # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+    # train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)
 
     # TODO Unrolling in time?
 
-    tf.contrib.training.train(train_op, save_checkpoint_secs=60,
-                              logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
+    # tf.contrib.training.train(train_op, save_checkpoint_secs=60,
+    #                           logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
 
 if __name__ == '__main__':
     tf.app.run(main)
