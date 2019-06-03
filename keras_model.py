@@ -14,6 +14,8 @@ class CMPSCell(tf.keras.layers.Layer):
 
         self.bond_d = hparams.bond_dim
 
+        self.h_scale = hparams.h_scale
+        self.r_scale = hparams.r_scale
         self.h_reg = hparams.h_reg
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
@@ -37,8 +39,8 @@ class CMPSCell(tf.keras.layers.Layer):
             Rreal_init = Constant(self.R_in.real)
             Rimag_init = Constant(self.R_in.imag)
         else:
-            Rreal_init = RandomNormal(stddev=tf.rsqrt(self.r_reg))
-            Rimag_init = RandomNormal(stddev=tf.rsqrt(self.r_reg))
+            Rreal_init = RandomNormal(stddev=self.r_scale)
+            Rimag_init = RandomNormal(stddev=self.r_scale)
 
         Rx = self.add_variable("Rx", dtype=tf.float32, shape=2*[self.bond_d],
                                initializer=Rreal_init,
@@ -54,7 +56,7 @@ class CMPSCell(tf.keras.layers.Layer):
         if self.freqs_in is not None:
             freqs_init = Constant(self.freqs_in)
         else:
-            freqs_init = RandomNormal(stddev=tf.rsqrt(self.h_reg))
+            freqs_init = RandomNormal(stddev=self.h_scale)
 
         self.freqs = self.add_variable("freqs", dtype=tf.float32, shape=[self.bond_d],
                                        initializer=freqs_init,

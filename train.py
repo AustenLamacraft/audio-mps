@@ -39,8 +39,8 @@ def main(argv):
     #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
     #                   initial_rank=None, A=1., learning_rate=0.001)
 
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.0001,
-                      h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=0.1,
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.01,
+                      h_scale=1000., r_scale=1., h_reg=0., r_reg=0.,
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
@@ -57,8 +57,7 @@ def main(argv):
     # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
     # r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
-    mse = tf.keras.losses.MeanSquaredError()
-    model_loss = mse(model(data), data) # Note this is averaged over the data, probably not right
+    model_loss = tf.reduce_sum(tf.square(model(data) - data), axis=1) / (2 * hparams.sigma**2)
     batch_mean = tf.reduce_mean(model_loss)
 
     reg_loss = tf.reduce_sum(model.sse.losses)
@@ -70,7 +69,7 @@ def main(argv):
         model_vars = model.trainable_weights
         tf.summary.scalar("A", tf.reshape(model_vars[0], []))
         tf.summary.scalar("freqs_reg", tf.reduce_sum(model.sse.losses[2]))
-        tf.summary.scalar("r", tf.reduce_sum(model.sse.losses[0] + model.sse.losses[1]))
+        tf.summary.scalar("r_reg", tf.reduce_sum(model.sse.losses[0] + model.sse.losses[1]))
 
 
         # gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
