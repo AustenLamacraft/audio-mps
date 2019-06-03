@@ -57,10 +57,9 @@ def main(argv):
     # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
     # r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
-
-    model_loss = tf.reduce_sum(model(data), axis=1)
+    mse = tf.keras.losses.MeanSquaredError()
+    model_loss = mse(model(data), data) # Note this is averaged over the data, probably not right
     batch_mean = tf.reduce_mean(model_loss)
-    tf.losses.add_loss(batch_mean)
 
     reg_loss = tf.reduce_sum(model.sse.losses)
     total_loss = batch_mean + reg_loss
@@ -70,8 +69,9 @@ def main(argv):
     with tf.variable_scope("summaries"):
         model_vars = model.trainable_weights
         tf.summary.scalar("A", tf.reshape(model_vars[0], []))
-        # tf.summary.scalar("h_l2norm", tf.sqrt(h_l2sqnorm))
-        # tf.summary.scalar("r_l2norm", tf.sqrt(r_l2sqnorm))
+        tf.summary.scalar("freqs_reg", tf.reduce_sum(model.sse.losses[2]))
+        tf.summary.scalar("r", tf.reduce_sum(model.sse.losses[0] + model.sse.losses[1]))
+
 
         # gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
         # tf.summary.scalar("gr_decay_time", 1 / gr_rate)
@@ -83,32 +83,32 @@ def main(argv):
         tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
         tf.summary.histogram("frequencies", model_vars[3] / (2 * np.pi))
 
-        # if FLAGS.num_samples != 0:
-            # samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
-            # tf.summary.audio("samples", samples, sample_rate=FLAGS.sample_rate, max_outputs=5)
+        if FLAGS.num_samples != 0:
+            samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
+            tf.summary.audio("samples", samples, sample_rate=FLAGS.sample_rate, max_outputs=5)
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
             data_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
             tf.summary.image("data_waveform", data_waveform_op)
-            # sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
-            # tf.summary.image("sample_waveform", sample_waveform_op)
+            sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
+            tf.summary.image("sample_waveform", sample_waveform_op)
 
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=hparams.learning_rate),
-                  loss='mse')
+    # model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=hparams.learning_rate),
+    #               loss='mse')
+    #
+    # tb_call = tf.keras.callbacks.TensorBoard(log_dir=logdir, write_images=True,
+    #                                          batch_size=hparams.minibatch_size, update_freq=100)
+    #
+    # model.fit(x=data, y=data, batch_size=hparams.minibatch_size, steps_per_epoch=100, callbacks=[tb_call])
 
-    tb_call = tf.keras.callbacks.TensorBoard(log_dir=logdir, write_images=True,
-                                             batch_size=hparams.minibatch_size, update_freq=100)
-
-    model.fit(x=data, y=data, batch_size=hparams.minibatch_size, steps_per_epoch=100, callbacks=[tb_call])
-
-    # step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
-    # train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)
+    step = tf.get_variable("global_step", [], tf.int64, tf.zeros_initializer(), trainable=False)
+    train_op = tf.train.AdamOptimizer(learning_rate=hparams.learning_rate).minimize(total_loss, global_step=step)
 
     # TODO Unrolling in time?
 
-    # tf.contrib.training.train(train_op, save_checkpoint_secs=60,
-    #                           logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
+    tf.contrib.training.train(train_op, save_checkpoint_secs=60,
+                              logdir=f"{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}")
 
 if __name__ == '__main__':
     tf.app.run(main)
