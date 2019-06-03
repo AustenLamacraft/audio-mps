@@ -70,7 +70,7 @@ class PsiCMPSCell(CMPSCell):
         super().__init__(hparams, *args, **kwargs)
 
         self.psi_in = psi_in
-        self.state_size = hparams.bond_dim
+        self.state_size = (hparams.bond_dim, 1)
         self.output_size = 1
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
@@ -92,32 +92,33 @@ class PsiCMPSCell(CMPSCell):
         psi_0 = tf.expand_dims(psi_0, axis=0)
         state = tf.tile(psi_0, [batch_size, 1])
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
-        return state
+        return [state, tf.zeros((batch_size), dtype=tf.float32)]
 
-    def call(self, signal_time, psi):
-        psi = psi[0] # Keras RNN expect the states in a list, even if it's a single state tensor.
-        # Inputs are values and times, output is prediction for next value
-        signal = signal_time[:, 0]
-        t = signal_time[:, 1]
-        output = signal + self.A * self._expectation(psi, t) * self.delta_t
-        psi = self._update_ancilla(psi, signal, t)
+    def call(self, x_t, state, training=True):
+        psi = state[0]
+        lastx = tf.cast(state[1], dtype=tf.float32)
+        # Inputs are values and times
+        x = x_t[:, 0]
+        t = x_t[:, 1]
+        psi = self._update_ancilla(psi, x - lastx, t)
         psi = normalize_psi(psi, axis=1)
-        return output, [psi]
-
-    # def _loss(self, psi, signal_time):
-    #     signal = signal_time[:, 0]
-    #     t = signal_time[:, 1]
-    #     exp = self._expectation(psi, t)
-    #     return - self.A * exp * signal + self.A**2 * exp**2 * self.delta_t / 2.
+        if training:
+            # Prediction for next value
+            output = x + self.A * self._expectation(psi, t) * self.delta_t
+            return output, [psi, x]
+        else:
+            # For sampling x is noise
+            inc = x + self.A * self._expectation(psi, t) * self.delta_t
+            return lastx + inc, [psi, lastx + inc]
 
     def _sample(self, psi, noise_time):
         noise = noise_time[:, 0]
         t = noise_time[:, 1]
         return self.A * self._expectation(psi, t) * self.delta_t + noise
 
-    def _update_ancilla(self, psi, signal, t):
+    def _update_ancilla(self, psi, inc, t):
         with tf.variable_scope("update_ancilla"):
-            signal = tf.cast(signal, dtype=tf.complex64)
+            inc = tf.cast(inc, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
             freqsc = tf.cast(self.freqs, dtype=tf.complex64)
             phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
@@ -129,7 +130,7 @@ class PsiCMPSCell(CMPSCell):
             # I guess we could do this in one go and einsum would figure out the correct way...
 
             delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
-            delta_Upsi += tf.expand_dims(signal, axis=1) * RUpsi
+            delta_Upsi += tf.expand_dims(inc, axis=1) * RUpsi
 
             delta_psi = phases * delta_Upsi
 
@@ -185,5 +186,5 @@ class SchrodingerRNN(tf.keras.Model):
         noise = tf.random_normal([num_samples, sample_duration],
                                  stddev=self.sigma * np.sqrt(self.delta_t))
 
-        sampled_incs = self.sse(noise, training=False)
-        return tf.math.cumsum(sampled_incs, axis=1)
+        samples = self.sse(noise, training=False)
+        return samples

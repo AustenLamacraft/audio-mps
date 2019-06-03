@@ -11,7 +11,8 @@ tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
 FLAGS = tf.flags.FLAGS
 
 hps = HParams(minibatch_size=8, bond_dim=7, delta_t=1 / FLAGS.sample_rate, sigma=0.0001, initial_rank=None, A=100.,
-              h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate))
+              h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate),
+              h_scale=2/(np.pi * FLAGS.sample_rate)**2, r_scale=2/(np.pi * FLAGS.sample_rate))
 
 
 class TestCMPSCell(tf.test.TestCase):
@@ -30,7 +31,7 @@ class TestPsiCMPSCell(tf.test.TestCase):
     def testGetInitialState(self):
 
         cell = PsiCMPSCell(hps)
-        psi_0 = cell.get_initial_state(batch_size=hps.minibatch_size)
+        psi_0, _ = cell.get_initial_state(batch_size=hps.minibatch_size)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -46,13 +47,13 @@ class TestPsiCMPSCell(tf.test.TestCase):
         input = tf.stack([signal, time], axis=1)
 
         cell = PsiCMPSCell(hps, freqs_in=test_freqs, R_in=test_R)
-        psi_0 = [cell.get_initial_state(batch_size=hps.minibatch_size)]
+        psi_0 = cell.get_initial_state(batch_size=hps.minibatch_size)[0]
         cell.build(0)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            _, updated_psi = cell.call(input, psi_0)
-            self.assertAllClose(updated_psi, psi_0)
+            _, updated_psi = cell.call(input, [psi_0, tf.zeros((hps.minibatch_size))])
+            self.assertAllClose(updated_psi[0], psi_0)
 
     def testRegularizerLosses(self):
         cell = PsiCMPSCell(hps)
