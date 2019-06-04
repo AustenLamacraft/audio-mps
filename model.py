@@ -127,7 +127,7 @@ class RhoCMPS(CMPS):
 
         rho, samples, _ = tf.scan(self._rho_and_sample_update, _OU_increments(),
                                   initializer=(rho_0, batch_zeros, 0.), name="sample_scan")
-        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi values
+        # TODO The use of tf.scan here must have some inefficiency as we keep all the intermediate psi valuess
         return tf.transpose(samples, [1, 0])
 
     # =====================
