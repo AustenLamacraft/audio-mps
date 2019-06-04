@@ -169,7 +169,7 @@ class StochasticSchrodinger(tf.keras.layers.RNN):
         time = tf.tile(time, [batch_size, 1])
         # time = tf.stack(batch_size * [time]) # Doesn't work when batch_size a tensor
         rnn_inputs = tf.stack([inputs, time], axis=2)
-        output = super().call(rnn_inputs, training)
+        output = super().call(rnn_inputs, training=training)
         return output
 
 
