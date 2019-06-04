@@ -7,7 +7,7 @@ def symmetrize(M):
         M_lower = tf.matrix_band_part(M, -1, 0)
         return M_lower + tf.matrix_transpose(M_lower) - tf.diag_part(M)
 
-def normalize_psi(x, axis=None, epsilon=1e-12):
+def normalize(x, axis=None, epsilon=1e-12):
     #TODO change the method so that it ise clear that the argument axis changes whether we normalize a single psi
     #TODO or a batch of psis
     with tf.variable_scope("normalize"):

@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from utils import symmetrize, normalize_psi
+from utils import symmetrize, normalize
 from tensorflow.keras.initializers import RandomNormal, Constant
 from tensorflow.keras.regularizers import L1L2
 
@@ -51,7 +51,7 @@ class CMPSCell(tf.keras.layers.Layer):
                                regularizer=L1L2(l2=self.r_reg))
 
         self.R = tf.complex(Rx, Ry)
-        self.R -= tf.matrix_diag_part(self.R)  # Remove diagonal part
+        self.R -= tf.matrix_diag(tf.matrix_diag_part(self.R))  # Remove diagonal part
 
         if self.freqs_in is not None:
             freqs_init = Constant(self.freqs_in)
@@ -90,7 +90,7 @@ class PsiCMPSCell(CMPSCell):
                                   dtype=dtype, initializer=psi_imag_init)
 
         psi_0 = tf.complex(psi_x, psi_y)
-        psi_0 = normalize_psi(psi_0)  # No need of axis=1 because this is not a batch of psis
+        psi_0 = normalize(psi_0)  # No need of axis=1 because this is not a batch of psis
         psi_0 = tf.expand_dims(psi_0, axis=0)
         psi_0 = tf.tile(psi_0, [batch_size, 1])
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
@@ -108,7 +108,7 @@ class PsiCMPSCell(CMPSCell):
         t = x_t[:, 1]
         if training:
             psi = self._update_ancilla(psi, x - lastx, t)
-            psi = normalize_psi(psi, axis=1)
+            psi = normalize(psi, axis=1)
             # Prediction for next value
             output = x + self.A * self._expectation(psi, t) * self.delta_t
             return output, [psi, x]
@@ -117,7 +117,7 @@ class PsiCMPSCell(CMPSCell):
             inc = x + self.A * self._expectation(psi, t) * self.delta_t
             nextx = lastx + inc
             psi = self._update_ancilla(psi, inc, t)
-            psi = normalize_psi(psi, axis=1)
+            psi = normalize(psi, axis=1)
             return nextx, [psi, nextx]
 
     def _update_ancilla(self, psi, inc, t):
@@ -144,6 +144,7 @@ class PsiCMPSCell(CMPSCell):
         with tf.variable_scope("expectation"):
             t = tf.cast(t, dtype=tf.complex64)
             freqsc = tf.cast(self.freqs, dtype=tf.complex64)
+            psi = normalize(tf.ones_like(psi, dtype=tf.complex64), axis=1)
             phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
             exp = tf.einsum('ab,bc,ac->a', tf.conj(Upsi), self.R, Upsi)

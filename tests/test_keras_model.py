@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from keras_model import CMPSCell, PsiCMPSCell, StochasticSchrodinger, SchrodingerRNN
+from utils import normalize
 from data import get_audio
 
 from tensorflow.contrib.training import HParams
@@ -26,17 +27,46 @@ class TestCMPSCell(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(tf.matrix_diag_part(model.R.eval()), hps.bond_dim * [0.])
 
+    def testFreqsCorrectlyInitializedGivenInitialValues(self):
+
+        test_freqs = np.random.rand(hps.bond_dim).astype(dtype=np.float32)
+        test_R = np.random.rand(hps.bond_dim, hps.bond_dim).astype(dtype=np.float32)
+
+        cell = CMPSCell(hps, freqs_in=test_freqs, R_in=test_R)
+        cell.build(0)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            self.assertAllEqual(test_freqs, cell.freqs.eval())
+            # self.assertAllEqual(test_R, cell.R.eval())
+
+    def testRCorrectlyInitializedGivenInitialValues(self):
+
+        test_freqs = np.random.rand(hps.bond_dim).astype(dtype=np.float32)
+        test_R = np.random.rand(hps.bond_dim, hps.bond_dim).astype(dtype=np.float32)
+        # Remove diagonal
+        test_R -= np.diag(np.diag(test_R))
+
+        cell = CMPSCell(hps, freqs_in=test_freqs, R_in=test_R)
+        cell.build(0)
+
+        with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            self.assertAllEqual(test_R, cell.R.eval())
+
 class TestPsiCMPSCell(tf.test.TestCase):
 
-    def testGetInitialState(self):
+    def testInitialStateHasCorrectShapeAndNormalization(self):
 
         cell = PsiCMPSCell(hps)
         psi_0, _ = cell.get_initial_state(batch_size=hps.minibatch_size)
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            psi_eval = psi_0.eval()
-            self.assertEqual(psi_eval.shape, (hps.minibatch_size, hps.bond_dim))
+            self.assertEqual(psi_0.shape, (hps.minibatch_size, hps.bond_dim))
+            self.assertAllClose(psi_0, normalize(psi_0, axis=1))
+            norms = tf.reduce_sum(tf.square(tf.abs(psi_0)), axis=1)
+            self.assertAllClose(norms, tf.ones([hps.minibatch_size], dtype=tf.complex64))
 
     def testTrivialUpdatOfAncilla(self):
 
@@ -50,7 +80,8 @@ class TestPsiCMPSCell(tf.test.TestCase):
         psi_0 = cell.get_initial_state(batch_size=hps.minibatch_size)[0]
         cell.build(0)
 
-    def testExpectationOfIdentityCloseToOne(self):
+    def testExpectationOfIdentityCloseToZero(self):
+        # Note that it's zero because we remove diagonal
         test_freqs = np.random.rand(hps.bond_dim).astype(dtype=np.float32)
         test_R = np.identity(hps.bond_dim, dtype=np.complex64)
         time = np.random.rand(hps.minibatch_size).astype(dtype=np.float32)
@@ -63,7 +94,7 @@ class TestPsiCMPSCell(tf.test.TestCase):
 
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            self.assertAllClose(exp, tf.ones([hps.minibatch_size], dtype=tf.float32))
+            self.assertAllClose(exp, tf.zeros([hps.minibatch_size], dtype=tf.float32))
 
     def testRegularizerLosses(self):
         cell = PsiCMPSCell(hps)
