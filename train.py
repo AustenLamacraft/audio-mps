@@ -35,10 +35,6 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 
 def main(argv):
-    # hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.000001,
-    #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
-    #                   initial_rank=None, A=1., learning_rate=0.001)
-
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.001,
                       h_scale=1000., r_scale=1., h_reg=0.1, r_reg=1.,
                       initial_rank=None, A=1., learning_rate=0.001)
@@ -60,8 +56,9 @@ def main(argv):
     # predictions = model(data)
     # pred_incs = predictions[:, 1:] - predictions[:, :-1]
 
-    # This is mean not sum
-    model_loss = tf.reduce_mean(tf.square(model(data) - data)) / (2 * hparams.sigma**2 * hparams.delta_t)
+    # TODO Should this be mean or sum?
+    model_loss = FLAGS.sample_duration * \
+                 tf.reduce_mean(tf.square(model(data) - data)) / (2 * hparams.sigma**2 * hparams.delta_t)
 
     reg_loss = tf.reduce_sum(model.sse.losses)
     total_loss = model_loss + reg_loss
@@ -95,9 +92,9 @@ def main(argv):
             data_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
             tf.summary.image("data_waveform", data_waveform_op)
             # Predictions from the model
-            model_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(model(data),
-                                                                          hparams.minibatch_size * [hparams.delta_t])
-            tf.summary.image("model_waveform", model_waveform_op)
+            # model_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(model(data),
+            #                                                               hparams.minibatch_size * [hparams.delta_t])
+            # tf.summary.image("model_waveform", model_waveform_op)
             # Samples
             sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
             tf.summary.image("sample_waveform", sample_waveform_op)
