@@ -39,8 +39,8 @@ def main(argv):
     #                   h_reg=200/(np.pi * FLAGS.sample_rate)**2, r_reg=2000/(np.pi * FLAGS.sample_rate),
     #                   initial_rank=None, A=1., learning_rate=0.001)
 
-    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.01,
-                      h_scale=1000., r_scale=1., h_reg=0., r_reg=0.,
+    hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.001,
+                      h_scale=1000., r_scale=1., h_reg=0.1, r_reg=1.,
                       initial_rank=None, A=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
@@ -57,11 +57,15 @@ def main(argv):
     # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
     # r_l2sqnorm = tf.real(tf.reduce_sum(tf.conj(model.R) * model.R))
 
-    model_loss = tf.reduce_sum(tf.square(model(data) - data), axis=1) / (2 * hparams.sigma**2)
-    batch_mean = tf.reduce_mean(model_loss)
+    # data_incs = data[:, 1:] - data[:, :-1]
+    # predictions = model(data)
+    # pred_incs = predictions[:, 1:] - predictions[:, :-1]
+
+    # This is mean not sum
+    model_loss = tf.reduce_mean(tf.square(model(data) - data)) / (2 * hparams.sigma**2 * hparams.delta_t)
 
     reg_loss = tf.reduce_sum(model.sse.losses)
-    total_loss = batch_mean + reg_loss
+    total_loss = model_loss + reg_loss
 
     logdir = f'{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}'
 
@@ -75,7 +79,7 @@ def main(argv):
         # gr_rate = 2 * np.pi * hparams.sigma**2 * r_l2sqnorm / hparams.bond_dim
         # tf.summary.scalar("gr_decay_time", 1 / gr_rate)
 
-        tf.summary.scalar("model_loss", tf.reshape(batch_mean, []))
+        tf.summary.scalar("model_loss", tf.reshape(model_loss, []))
         tf.summary.scalar("reg_loss", tf.reshape(reg_loss, []))
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
@@ -88,8 +92,14 @@ def main(argv):
 
         if FLAGS.visualize:
             # Doesn't work for Datasets where batch size can't be inferred
+            # Input data
             data_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(data, hparams.minibatch_size * [hparams.delta_t])
             tf.summary.image("data_waveform", data_waveform_op)
+            # Predictions from the model
+            model_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(model(data),
+                                                                          hparams.minibatch_size * [hparams.delta_t])
+            tf.summary.image("model_waveform", model_waveform_op)
+            # Samples
             sample_waveform_op = tfplot.autowrap(waveform_plot, batch=True)(samples, FLAGS.num_samples * [hparams.delta_t])
             tf.summary.image("sample_waveform", sample_waveform_op)
 

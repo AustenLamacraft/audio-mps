@@ -50,10 +50,20 @@ class TestPsiCMPSCell(tf.test.TestCase):
         psi_0 = cell.get_initial_state(batch_size=hps.minibatch_size)[0]
         cell.build(0)
 
+    def testExpectationOfIdentityCloseToOne(self):
+        test_freqs = np.random.rand(hps.bond_dim).astype(dtype=np.float32)
+        test_R = np.identity(hps.bond_dim, dtype=np.complex64)
+        time = np.random.rand(hps.minibatch_size).astype(dtype=np.float32)
+
+        cell = PsiCMPSCell(hps, freqs_in=test_freqs, R_in=test_R)
+        cell.build(0)
+
+        psi_0 = cell.get_initial_state(batch_size=hps.minibatch_size)[0]
+        exp = cell._expectation(psi_0, time)
+
         with self.cached_session() as sess:
             sess.run(tf.global_variables_initializer())
-            _, updated_psi = cell.call(input, [psi_0, tf.zeros((hps.minibatch_size))])
-            self.assertAllClose(updated_psi[0], psi_0)
+            self.assertAllClose(exp, tf.ones([hps.minibatch_size], dtype=tf.float32))
 
     def testRegularizerLosses(self):
         cell = PsiCMPSCell(hps)

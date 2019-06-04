@@ -74,7 +74,9 @@ class PsiCMPSCell(CMPSCell):
         self.output_size = 1
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
-
+        """
+        State consists of ancilla state and last signal value.
+        """
         if self.psi_in is not None:
             psi_real_init = Constant(self.psi_in.real)
             psi_imag_init = Constant(self.psi_in.real)
@@ -90,31 +92,33 @@ class PsiCMPSCell(CMPSCell):
         psi_0 = tf.complex(psi_x, psi_y)
         psi_0 = normalize_psi(psi_0)  # No need of axis=1 because this is not a batch of psis
         psi_0 = tf.expand_dims(psi_0, axis=0)
-        state = tf.tile(psi_0, [batch_size, 1])
+        psi_0 = tf.tile(psi_0, [batch_size, 1])
         # state = tf.stack(batch_size * [psi_0]) # This doesn't work when batch_size is a tensor
-        return [state, tf.zeros((batch_size), dtype=tf.float32)]
+        x_0 = tf.zeros((batch_size), dtype=tf.float32)
+        return [psi_0, x_0]
 
     def call(self, x_t, state, training=True):
+        """
+        At training time, inputs are values and times.
+        At sampling, inputs are noise values and times
+        """
         psi = state[0]
         lastx = tf.cast(state[1], dtype=tf.float32)
-        # Inputs are values and times
         x = x_t[:, 0]
         t = x_t[:, 1]
-        psi = self._update_ancilla(psi, x - lastx, t)
-        psi = normalize_psi(psi, axis=1)
         if training:
+            psi = self._update_ancilla(psi, x - lastx, t)
+            psi = normalize_psi(psi, axis=1)
             # Prediction for next value
             output = x + self.A * self._expectation(psi, t) * self.delta_t
             return output, [psi, x]
         else:
             # For sampling x is noise
             inc = x + self.A * self._expectation(psi, t) * self.delta_t
-            return lastx + inc, [psi, lastx + inc]
-
-    def _sample(self, psi, noise_time):
-        noise = noise_time[:, 0]
-        t = noise_time[:, 1]
-        return self.A * self._expectation(psi, t) * self.delta_t + noise
+            nextx = lastx + inc
+            psi = self._update_ancilla(psi, inc, t)
+            psi = normalize_psi(psi, axis=1)
+            return nextx, [psi, nextx]
 
     def _update_ancilla(self, psi, inc, t):
         with tf.variable_scope("update_ancilla"):
