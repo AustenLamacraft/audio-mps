@@ -47,7 +47,6 @@ def main(argv):
     with tf.variable_scope("data"):
         data = get_audio(datadir=FLAGS.datadir, dataset=FLAGS.dataset, hps=hparams)
 
-
     # if FLAGS.mps_model == 'rho_mps':
     #     model = RhoCMPS(hparams=hparams, data_iterator=data)
     # else:
