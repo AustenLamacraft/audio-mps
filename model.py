@@ -40,7 +40,7 @@ class CMPS:
                                                              initializer=tf.random_normal_initializer)
 
         self.R = tf.complex(Rx, Ry)
-        self.R -= tf.matrix_diag_part(self.R) # Remove diagonal part
+        self.R -= tf.matrix_diag(tf.matrix_diag_part(self.R)) # Remove diagonal part
 
         if freqs_in is not None:
 
