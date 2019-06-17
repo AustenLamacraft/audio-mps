@@ -79,7 +79,7 @@ class PsiCMPSCell(CMPSCell):
         """
         if self.psi_in is not None:
             psi_real_init = Constant(self.psi_in.real)
-            psi_imag_init = Constant(self.psi_in.real)
+            psi_imag_init = Constant(self.psi_in.imag)
         else:
             psi_real_init = None
             psi_imag_init = None
