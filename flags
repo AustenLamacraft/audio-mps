@@ -1,5 +1,5 @@
 # Here I define my flags
 
---sample_duration=512
---dataset=damped_sine_2_freq
+--sample_duration=100
+--dataset=fixed_damped_sine_2_freq
 --mps_model=psi_mps
