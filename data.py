@@ -43,6 +43,21 @@ def get_audio(datadir, dataset, hps):
         data = sine_wave_fixed
         datalog = f"_freq{freq}_dect{decay_time}"
 
+    elif dataset == 'fixed_damped_sine_2_freq':
+
+        input_length = FLAGS.sample_duration
+        freqa = 600.
+        freqb = 800.
+        decay_time = 0.003
+
+        input_range = tf.expand_dims(tf.range(input_length, dtype=np.float32), axis=0)
+        times = input_range * delta_t
+        sine_wave_fixed_a = tf.sin(2 * np.pi * freqa * times) * tf.exp(- times / decay_time)
+        sine_wave_fixed_b = tf.sin(2 * np.pi * freqb * times) * tf.exp(- times / decay_time)
+
+        data = tf.concat([sine_wave_fixed_a, sine_wave_fixed_b], 0)
+        datalog = f"_freqa{freq1}_freqb{freq2}_dect{decay_time}_delt{delay_time}_fix"
+
     elif dataset == 'damped_sine_2_freq':
 
         input_length = FLAGS.sample_duration
@@ -63,7 +78,7 @@ def get_audio(datadir, dataset, hps):
         sine_wave_random_delay_1 = 0.5 * (tf.sign(times) + 1) \
                                  * tf.sin(2 * np.pi * freq1 * times) * tf.exp(- times / decay_time)
         sine_wave_random_delay_2 = 0.5 * (tf.sign(times) + 1) \
-                                  * tf.sin(2 * np.pi * freq2 * times) * tf.exp(- times / decay_time)
+                                 * tf.sin(2 * np.pi * freq2 * times) * tf.exp(- times / decay_time)
 
         data = tf.concat([sine_wave_random_delay_1,sine_wave_random_delay_2],0)
         datalog = f"_freqa{freq1}_freqb{freq2}_dect{decay_time}_delt{delay_time}"
