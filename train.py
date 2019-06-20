@@ -47,6 +47,8 @@ def main(argv):
     #     model = RhoCMPS(hparams=hparams, data_iterator=data)
     # else:
     #     model = PsiCMPS(hparams=hparams, data_iterator=data)
+
+
     model = SchrodingerRNN(hparams=hparams)
 
     # h_l2sqnorm = tf.reduce_sum(tf.square(model.freqs))
@@ -56,9 +58,7 @@ def main(argv):
     # predictions = model(data)
     # pred_incs = predictions[:, 1:] - predictions[:, :-1]
 
-    # TODO Should this be mean or sum?
-    model_loss = FLAGS.sample_duration * \
-                 tf.reduce_mean(tf.square(model(data) - data)) / (2 * hparams.sigma**2 * hparams.delta_t)
+    model_loss = tf.reduce_mean(model.loss(data))
 
     reg_loss = tf.reduce_sum(model.sse.losses)
     total_loss = model_loss + reg_loss

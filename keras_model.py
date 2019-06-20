@@ -20,7 +20,9 @@ class CMPSCell(tf.keras.layers.Layer):
         self.r_reg = hparams.r_reg
         self.delta_t = hparams.delta_t
 
-        self.A_in = hparams.A
+        A_init = Constant(hparams.A)
+        self.A = self.add_variable("A", dtype=tf.float32, shape=[1], initializer=A_init)
+
         self.sigma = hparams.sigma
 
         self.freqs_in = freqs_in
@@ -31,9 +33,6 @@ class CMPSCell(tf.keras.layers.Layer):
         # ======================================================
         # Training variables (cannot be complex)
         # ======================================================
-
-        A_init = Constant(self.A_in)
-        self.A = self.add_variable("A", dtype=tf.float32, shape=[1], initializer=A_init)
 
         if self.R_in is not None:
             Rreal_init = Constant(self.R_in.real)
@@ -124,6 +123,7 @@ class PsiCMPSCell(CMPSCell):
         with tf.variable_scope("update_ancilla"):
             inc = tf.cast(inc, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
+            A = tf.cast(self.A, dtype=tf.complex64)
             freqsc = tf.cast(self.freqs, dtype=tf.complex64)
             phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
@@ -133,7 +133,7 @@ class PsiCMPSCell(CMPSCell):
             RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
             # I guess we could do this in one go and einsum would figure out the correct way...
 
-            delta_Upsi = - self.delta_t * self.sigma**2 * RdagRUpsi / 2.
+            delta_Upsi = - self.delta_t * A * RdagRUpsi / 2.
             delta_Upsi += tf.expand_dims(inc, axis=1) * RUpsi
 
             delta_psi = phases * delta_Upsi
@@ -153,10 +153,10 @@ class PsiCMPSCell(CMPSCell):
 
 class StochasticSchrodinger(tf.keras.layers.RNN):
     def __init__(self, hparams, **kwargs):
-        cell = PsiCMPSCell(hparams)
+        self.cell = PsiCMPSCell(hparams)
         self.delta_t = tf.constant(hparams.delta_t, tf.float32)
 
-        super().__init__(cell, return_sequences=True,
+        super().__init__(self.cell, return_sequences=True,
                          return_state=False, **kwargs)  # Note that batch major is the default
 
     def call(self, inputs, training=True):
@@ -187,9 +187,16 @@ class SchrodingerRNN(tf.keras.Model):
         predictions = tf.concat([signal[:, :1], predictions[:, :-1]], axis=1)
         return predictions
 
+    def loss(self, input):
+        A = self.sse.cell.A
+        neg_log_like = tf.log(2 * np.pi * A * self.delta_t) / 2 * tf.ones_like(input)
+        neg_log_like += tf.square(self.call(input) - input) / (2 * A * self.delta_t)
+        return neg_log_like
+
     def sample(self, num_samples, sample_duration):
+        A = self.sse.cell.A
         noise = tf.random_normal([num_samples, sample_duration],
-                                 stddev=self.sigma * np.sqrt(self.delta_t))
+                                 stddev=tf.sqrt(tf.abs(A) * self.delta_t))
 
         samples = self.sse(noise, training=False)
         return samples
