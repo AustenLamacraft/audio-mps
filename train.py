@@ -36,8 +36,8 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 
 def main(argv):
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.001,
-                      h_scale=1000., r_scale=1., h_reg=0.1, r_reg=1.,
-                      initial_rank=None, A=1., learning_rate=0.001)
+                      h_scale=1000., r_scale=1., h_reg=0., r_reg=1.,
+                      initial_rank=None, A=10., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -58,9 +58,9 @@ def main(argv):
     # predictions = model(data)
     # pred_incs = predictions[:, 1:] - predictions[:, :-1]
 
-    model_loss = tf.reduce_mean(model.loss(data))
+    model_loss = FLAGS.sample_duration * tf.reduce_mean(model.loss(data))
 
-    reg_loss = tf.reduce_sum(model.sse.losses)
+    reg_loss = tf.reduce_mean(model.sse.losses)
     total_loss = model_loss + reg_loss
 
     logdir = f'{FLAGS.logdir}/{hparams.bond_dim}_{hparams.delta_t}_{hparams.minibatch_size}'

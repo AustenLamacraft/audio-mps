@@ -123,7 +123,7 @@ class PsiCMPSCell(CMPSCell):
         with tf.variable_scope("update_ancilla"):
             inc = tf.cast(inc, dtype=tf.complex64)
             t = tf.cast(t, dtype=tf.complex64)
-            A = tf.cast(self.A, dtype=tf.complex64)
+            absA = tf.cast(tf.abs(self.A), dtype=tf.complex64)
             freqsc = tf.cast(self.freqs, dtype=tf.complex64)
             phases = tf.exp(1j * tf.einsum('a,b->ab', t, freqsc))
             Upsi = psi * tf.conj(phases)
@@ -133,7 +133,7 @@ class PsiCMPSCell(CMPSCell):
             RdagRUpsi = tf.einsum('bc,ac->ab', Rdag, RUpsi)
             # I guess we could do this in one go and einsum would figure out the correct way...
 
-            delta_Upsi = - self.delta_t * A * RdagRUpsi / 2.
+            delta_Upsi = - self.delta_t * absA * RdagRUpsi / 2.
             delta_Upsi += tf.expand_dims(inc, axis=1) * RUpsi
 
             delta_psi = phases * delta_Upsi
@@ -189,8 +189,8 @@ class SchrodingerRNN(tf.keras.Model):
 
     def loss(self, input):
         A = self.sse.cell.A
-        neg_log_like = tf.log(2 * np.pi * A * self.delta_t) / 2 * tf.ones_like(input)
-        neg_log_like += tf.square(self.call(input) - input) / (2 * A * self.delta_t)
+        neg_log_like = tf.log(2 * np.pi * tf.abs(A) * self.delta_t) / 2 * tf.ones_like(input)
+        neg_log_like += tf.square(self.call(input) - input) / (2 * tf.abs(A) * self.delta_t)
         return neg_log_like
 
     def sample(self, num_samples, sample_duration):
