@@ -28,7 +28,7 @@ def get_audio(datadir, dataset, hps):
                                  * tf.sin(2 * np.pi * freq * times) * tf.exp(- times / decay_time)
 
         data = sine_wave_random_delay
-        datalog = f"_freq{freq}_dect{decay_time}_delt{delay_time}"
+
 
     elif dataset == 'fixed_damped_sine':
 
@@ -41,7 +41,7 @@ def get_audio(datadir, dataset, hps):
         sine_wave_fixed = tf.sin(2 * np.pi * freq * times) * tf.exp(- times / decay_time)
 
         data = sine_wave_fixed
-        datalog = f"_freq{freq}_dect{decay_time}"
+
 
     elif dataset == 'damped_sine_2_freq':
 
@@ -66,7 +66,7 @@ def get_audio(datadir, dataset, hps):
                                   * tf.sin(2 * np.pi * freq2 * times) * tf.exp(- times / decay_time)
 
         data = tf.concat([sine_wave_random_delay_1,sine_wave_random_delay_2],0)
-        datalog = f"_freqa{freq1}_freqb{freq2}_dect{decay_time}_delt{delay_time}"
+
 
     elif dataset == 'gaussian_process':
 
@@ -126,7 +126,7 @@ def get_audio(datadir, dataset, hps):
 
 
         data = spectral_mixture(FLAGS.sample_duration, hps.minibatch_size, D_mix)
-        datalog = f"_Dmix{D_mix}"
+
 
     else:
 
@@ -148,5 +148,5 @@ def get_audio(datadir, dataset, hps):
 
         data = batch['audio']
 
-    return data, datalog
+    return data
 
