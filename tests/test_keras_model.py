@@ -12,7 +12,7 @@ tf.flags.DEFINE_integer("sample_rate", 16000, "Sampling rate.")
 FLAGS = tf.flags.FLAGS
 
 hps = HParams(minibatch_size=8, bond_dim=7, delta_t=1 / FLAGS.sample_rate, sigma=0.0001, initial_rank=None, A=100.,
-              h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate),
+              theta=1., h_reg=2/(np.pi * FLAGS.sample_rate)**2, r_reg=2/(np.pi * FLAGS.sample_rate),
               h_scale=2/(np.pi * FLAGS.sample_rate)**2, r_scale=2/(np.pi * FLAGS.sample_rate))
 
 

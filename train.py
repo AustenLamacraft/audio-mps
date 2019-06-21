@@ -39,7 +39,7 @@ tf.flags.DEFINE_string("logdir", f"../logging/audio_mps/{FLAGS.dataset}", "Direc
 def main(argv):
     hparams = HParams(minibatch_size=8, bond_dim=8, delta_t=1/FLAGS.sample_rate, sigma=0.001,
                       h_scale=1000., r_scale=1., h_reg=0., r_reg=1.,
-                      initial_rank=None, A=10., learning_rate=0.001)
+                      initial_rank=None, A=10., theta=1., learning_rate=0.001)
     hparams.parse(FLAGS.hparams)
 
     with tf.variable_scope("data"):
@@ -69,7 +69,9 @@ def main(argv):
 
     with tf.variable_scope("summaries"):
         model_vars = model.trainable_weights
+        # This is a hopeless way of getting variables...
         tf.summary.scalar("A", tf.reshape(model_vars[0], []))
+        tf.summary.scalar("theta", tf.reshape(model_vars[1], []))
         tf.summary.scalar("freqs_reg", tf.reduce_sum(model.sse.losses[2]))
         tf.summary.scalar("r_reg", tf.reduce_sum(model.sse.losses[0] + model.sse.losses[1]))
 
@@ -82,7 +84,7 @@ def main(argv):
         tf.summary.scalar("total_loss", tf.reshape(total_loss, []))
 
         tf.summary.audio("data", data, sample_rate=FLAGS.sample_rate, max_outputs=5)
-        tf.summary.histogram("frequencies", model_vars[3] / (2 * np.pi))
+        tf.summary.histogram("frequencies", model_vars[4] / (2 * np.pi))
 
         if FLAGS.num_samples != 0:
             samples = model.sample(FLAGS.num_samples, FLAGS.sample_duration)
