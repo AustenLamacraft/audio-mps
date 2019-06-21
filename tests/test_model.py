@@ -24,6 +24,9 @@ class TestCMPS(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertAllClose(tf.matrix_diag_part(model.R.eval()), hparams.bond_dim * [0.])
 
+if __name__ == '__main__':
+      tf.test.main()
+
 
 class TestRhoCMPS(tf.test.TestCase):
 
@@ -99,7 +102,6 @@ class TestRhoCMPS(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             self.assertEqual(waveform.eval().shape, (2, 512))
 
-
 class TestPsiCMPS(tf.test.TestCase):
 
     def testLossNotNaN(self):
@@ -158,3 +160,47 @@ class TestPsiCMPS(tf.test.TestCase):
 
 if __name__ == '__main__':
       tf.test.main()
+
+    def testPureRhoMatchPsi(self):
+        """
+        Compare loss of pure rho and psi
+        """
+        hparams = HParams(minibatch_size=1, bond_dim=2, delta_t=1 / 16000, sigma=0.0001,
+                          h_reg=200 / (np.pi * FLAGS.sample_rate) ** 2, r_reg=0.1,
+                          initial_rank=1, A=1., learning_rate=0.001)
+
+        test_freqs = tf.constant([2., 4.], dtype=tf.float32)
+        test_R = np.array([[1. + 1j, 2. + 2j], [3. + 3j, 4. + 4j]], dtype=np.complex64)
+        test_psi = np.array([.7 + 4.1j, 0.5 + 9.3j], dtype=np.complex64)
+        test_W = np.reshape(np.conj(test_psi), [1, 2])
+
+        # DATA
+        input_length = FLAGS.sample_duration
+        freq = 800.
+        decay_time = 0.003
+        hps = hparams
+        input_range = tf.expand_dims(tf.range(input_length, dtype=np.float32), axis=0)
+        times = input_range * hps.delta_t
+        sine_wave_fixed = tf.sin(2 * np.pi * freq * times) * tf.exp(- times / decay_time)
+        data = sine_wave_fixed
+
+        model_rho = RhoCMPS(hparams,
+                            data_iterator=data,
+                            freqs_in=test_freqs,
+                            R_in=test_R,
+                            W_in=test_W)
+
+        model_psi = PsiCMPS(hparams,
+                            data_iterator=data,
+                            freqs_in=test_freqs,
+                            R_in=test_R,
+                            psi_in=test_psi)
+
+        with tf.Session() as sess:
+            # with self.cached_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            loss_psi = model_psi.loss
+            loss_rho = model_rho.loss
+            #TODO should we worry about not passing the test if rtol,atol=e-6?
+            # I would say no because we are using single precision.
+            self.assertAllClose(loss_rho, loss_psi, rtol=1e-05, atol=1e-05)
