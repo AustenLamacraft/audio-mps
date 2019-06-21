@@ -24,7 +24,7 @@ class CMPSCell(tf.keras.layers.Layer):
         self.A = self.add_variable("A", dtype=tf.float32, shape=[1], initializer=A_init)
 
         theta_init = Constant(hparams.theta)
-        self.theta = self.add_variable("theta", dtype=tf.float32, shape=[1], initializer=theta_init)
+        self.theta = tf.abs(self.add_variable("theta", dtype=tf.float32, shape=[1], initializer=theta_init))
 
         self.freqs_in = freqs_in
         self.R_in = R_in
@@ -188,17 +188,17 @@ class SchrodingerRNN(tf.keras.Model):
         return predictions
 
     def loss(self, input):
-        A = self.sse.cell.A
+        A = tf.abs(self.sse.cell.A)
         theta = self.sse.cell.theta
-        neg_log_like = 0.5 * tf.log(np.pi * tf.abs(A) * (1 - tf.exp(-2 * theta * self.delta_t) / theta)) * tf.ones_like(input)
-        neg_log_like += theta * tf.square(self.call(input) - input) / (1 - tf.exp(-2 * theta * self.delta_t)) / A
+        neg_log_like = 0.5 * tf.log((np.pi * A / theta) * (1 - tf.exp(-2 * theta * self.delta_t))) * tf.ones_like(input)
+        neg_log_like += (theta / A) * tf.square(self.call(input) - input) / (1 - tf.exp(-2 * theta * self.delta_t))
         return neg_log_like
 
     def sample(self, num_samples, sample_duration):
-        A = self.sse.cell.A
+        A = tf.abs(self.sse.cell.A)
         theta = self.sse.cell.theta
         noise = tf.random_normal([num_samples, sample_duration],
-                                 stddev=tf.sqrt(tf.abs(A) * (1 - tf.exp(-2 * theta * self.delta_t) / (2 * theta))))
+                                 stddev=tf.sqrt(A * (1 - tf.exp(-2 * theta * self.delta_t)) / (2 * theta)))
 
         samples = self.sse(noise, training=False)
         return samples
